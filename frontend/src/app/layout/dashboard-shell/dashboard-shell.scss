@@ -1,0 +1,42 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidenav {
+  width: 200px;
+  flex-shrink: 0;
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  .brand {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+  }
+
+  a {
+    color: #d1d5db;
+    text-decoration: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+
+    &:hover {
+      background: #374151;
+    }
+
+    &.active {
+      background: #2563eb;
+      color: white;
+    }
+  }
+}
+
+.content {
+  flex: 1;
+  padding: 1.5rem 2rem;
+  background: #f3f4f6;
+}
