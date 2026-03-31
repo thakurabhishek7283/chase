@@ -1,0 +1,44 @@
+<h2>{{ isEdit() ? 'Edit Resume' : 'New Resume' }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <label>
+    Owner
+    <select formControlName="user_id">
+      <option value="" disabled>Select a user</option>
+      @for (user of users(); track user.id) {
+        <option [value]="user.id">{{ user.full_name }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Title
+    <input type="text" formControlName="title" />
+  </label>
+
+  <label>
+    Version label
+    <input type="text" formControlName="version_label" placeholder="e.g. Tailored for Google SWE" />
+  </label>
+
+  <label class="upload">
+    Import from PDF
+    <input type="file" accept="application/pdf" (change)="onPdfSelected($event)" [disabled]="uploading()" />
+    @if (uploading()) {
+      <span class="hint">Extracting…</span>
+    }
+    @if (uploadNotice()) {
+      <span class="hint success">{{ uploadNotice() }}</span>
+    }
+    @if (uploadError()) {
+      <span class="hint error">{{ uploadError() }}</span>
+    }
+  </label>
+
+  <label>
+    Content (Markdown)
+    <textarea formControlName="content" rows="10"></textarea>
+  </label>
+
+  <button type="submit" [disabled]="form.invalid">Save</button>
+</form>

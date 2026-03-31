@@ -1,0 +1,30 @@
+<h2>{{ isEdit() ? 'Edit Company' : 'New Company' }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <label>
+    Name
+    <input type="text" formControlName="name" />
+  </label>
+
+  <label>
+    Industry
+    <input type="text" formControlName="industry" />
+  </label>
+
+  <label>
+    Growth trajectory
+    <select formControlName="growth_trajectory">
+      <option value="">—</option>
+      @for (option of growthOptions; track option) {
+        <option [value]="option">{{ option }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Website
+    <input type="text" formControlName="website" />
+  </label>
+
+  <button type="submit" [disabled]="form.invalid">Save</button>
+</form>

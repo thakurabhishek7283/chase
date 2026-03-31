@@ -1,0 +1,40 @@
+<h2>{{ isEdit() ? 'Edit User' : 'New User' }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <label>
+    Full name
+    <input type="text" formControlName="full_name" />
+  </label>
+
+  <label>
+    Email
+    <input type="email" formControlName="email" />
+  </label>
+
+  <label>
+    Current title
+    <input type="text" formControlName="current_title" />
+  </label>
+
+  <label>
+    Career goals
+    <textarea formControlName="career_goals" rows="3"></textarea>
+  </label>
+
+  <label>
+    Desired salary (min)
+    <input type="number" formControlName="desired_salary_min" />
+  </label>
+
+  <label>
+    Desired salary (max)
+    <input type="number" formControlName="desired_salary_max" />
+  </label>
+
+  <label>
+    Salary currency
+    <input type="text" formControlName="salary_currency" maxlength="3" />
+  </label>
+
+  <button type="submit" [disabled]="form.invalid">Save</button>
+</form>

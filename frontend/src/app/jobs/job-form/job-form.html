@@ -1,0 +1,45 @@
+<h2>{{ isEdit() ? 'Edit Job Profile' : 'New Job Profile' }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <label>
+    Company
+    <select formControlName="company_id">
+      <option value="" disabled>Select a company</option>
+      @for (company of companies(); track company.id) {
+        <option [value]="company.id">{{ company.name }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Position title
+    <input type="text" formControlName="position_title" />
+  </label>
+
+  <label>
+    Experience tier
+    <select formControlName="experience_tier">
+      <option value="">—</option>
+      @for (tier of experienceTiers; track tier) {
+        <option [value]="tier">{{ tier }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Description
+    <textarea formControlName="description" rows="4"></textarea>
+  </label>
+
+  <label>
+    Location
+    <input type="text" formControlName="location" />
+  </label>
+
+  <label>
+    Employment type
+    <input type="text" formControlName="employment_type" />
+  </label>
+
+  <button type="submit" [disabled]="form.invalid">Save</button>
+</form>
