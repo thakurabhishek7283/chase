@@ -1,0 +1,38 @@
+.column {
+  background: #e5e7eb;
+  border-radius: 10px;
+  padding: 0.75rem;
+  width: 260px;
+  flex-shrink: 0;
+
+  h3 {
+    font-size: 0.95rem;
+    margin: 0 0 0.75rem 0;
+    display: flex;
+    justify-content: space-between;
+
+    .count {
+      color: #6b7280;
+      font-weight: 400;
+    }
+  }
+}
+
+.drop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 80px;
+}
+
+.cdk-drag-preview {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.3;
+}
+
+.cdk-drop-list-dragging .cdk-drag {
+  transition: transform 200ms ease;
+}

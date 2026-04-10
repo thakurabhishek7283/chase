@@ -1,0 +1,17 @@
+<div class="column">
+  <h3>{{ stageLabels[stage()] }} <span class="count">{{ applications().length }}</span></h3>
+  <div
+    class="drop-list"
+    cdkDropList
+    [id]="stage()"
+    [cdkDropListData]="applications()"
+    [cdkDropListConnectedTo]="connectedStageIds()"
+    (cdkDropListDropped)="onDrop($event)"
+  >
+    @for (application of applications(); track application.id) {
+      <div cdkDrag [cdkDragData]="application">
+        <app-kanban-card [application]="application" />
+      </div>
+    }
+  </div>
+</div>
