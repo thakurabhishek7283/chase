@@ -1,0 +1,120 @@
+.lede {
+  color: #6b7280;
+  margin-top: -0.5rem;
+  max-width: 60ch;
+}
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  background: white;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: #374151;
+    min-width: 220px;
+  }
+
+  select {
+    padding: 0.45rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+
+  button {
+    border: 1px solid #d1d5db;
+    background: white;
+    padding: 0.5rem 1.1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+
+    &.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: white;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.notice {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: 0.65rem 1rem;
+  border-radius: 6px;
+}
+
+.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}
+
+.empty {
+  color: #6b7280;
+}
+
+.matches {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  li {
+    position: relative;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: #dbeafe;
+  }
+
+  .row {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+  }
+
+  .title {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .company {
+    font-size: 0.82rem;
+    color: #4b5563;
+  }
+
+  .tier {
+    color: #9ca3af;
+  }
+
+  .similarity {
+    font-weight: 700;
+    color: #1d4ed8;
+  }
+}

@@ -1,0 +1,55 @@
+<h2>Companies to Chase</h2>
+<p class="lede">
+  Ranks open job profiles by how closely they match a user's stated career goals, using vector
+  similarity rather than keyword overlap.
+</p>
+
+<div class="controls">
+  <label>
+    Career goals of
+    <select [ngModel]="selectedUserId()" (ngModelChange)="selectedUserId.set($event)">
+      <option value="" disabled>Select a user</option>
+      @for (user of users(); track user.id) {
+        <option [value]="user.id">{{ user.full_name }}</option>
+      }
+    </select>
+  </label>
+
+  <button type="button" class="primary" (click)="loadMatches()" [disabled]="!selectedUserId() || loading()">
+    {{ loading() ? 'Matching…' : 'Find matches' }}
+  </button>
+  <button type="button" (click)="reindex()" [disabled]="reindexing()">
+    {{ reindexing() ? 'Reindexing…' : 'Rebuild index' }}
+  </button>
+</div>
+
+@if (notice()) {
+  <p class="notice">{{ notice() }}</p>
+}
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+
+@if (matches().length) {
+  <ul class="matches">
+    @for (match of matches(); track match.job_profile.id) {
+      <li>
+        <div class="bar" [style.width.%]="percent(match.similarity)"></div>
+        <div class="row">
+          <div>
+            <div class="title">{{ match.job_profile.position_title }}</div>
+            <div class="company">
+              {{ match.company.name }}
+              @if (match.job_profile.experience_tier) {
+                <span class="tier">· {{ match.job_profile.experience_tier }}</span>
+              }
+            </div>
+          </div>
+          <div class="similarity">{{ percent(match.similarity) }}%</div>
+        </div>
+      </li>
+    }
+  </ul>
+} @else if (!loading() && !error()) {
+  <p class="empty">No matches yet. Pick a user and run a match.</p>
+}
