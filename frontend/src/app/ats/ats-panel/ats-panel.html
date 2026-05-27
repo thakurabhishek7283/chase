@@ -1,0 +1,150 @@
+<h2>ATS Optimizer</h2>
+
+<div class="controls">
+  <label>
+    Resume
+    <select [ngModel]="selectedResumeId()" (ngModelChange)="selectedResumeId.set($event)">
+      <option value="" disabled>Select a resume</option>
+      @for (resume of resumes(); track resume.id) {
+        <option [value]="resume.id">
+          {{ resume.title }}{{ resume.version_label ? ' — ' + resume.version_label : '' }}
+        </option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Target job
+    <select [ngModel]="selectedJobId()" (ngModelChange)="selectedJobId.set($event)">
+      <option value="" disabled>Select a job profile</option>
+      @for (job of jobProfiles(); track job.id) {
+        <option [value]="job.id">{{ job.position_title }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="narrow">
+    Target score
+    <input
+      type="number"
+      min="0"
+      max="100"
+      [ngModel]="targetScore()"
+      (ngModelChange)="targetScore.set($event)"
+    />
+  </label>
+
+  <label class="checkbox">
+    <input
+      type="checkbox"
+      [ngModel]="saveAsTailored()"
+      (ngModelChange)="saveAsTailored.set($event)"
+    />
+    Save result as tailored version
+  </label>
+
+  <div class="actions">
+    <button type="button" (click)="runScore()" [disabled]="!canRun() || scoring() || fixing()">
+      {{ scoring() ? 'Scoring…' : 'Score' }}
+    </button>
+    <button
+      type="button"
+      class="primary"
+      (click)="runAutofix()"
+      [disabled]="!canRun() || scoring() || fixing()"
+    >
+      {{ fixing() ? 'Autofixing…' : 'Autofix' }}
+    </button>
+  </div>
+</div>
+
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+
+@if (autofixResult(); as fix) {
+  <div class="autofix-summary">
+    <h3>Autofix complete</h3>
+    <p>
+      Score moved <strong>{{ fix.original_score }} → {{ fix.final_score }}</strong>
+      over {{ fix.iterations }} iteration{{ fix.iterations === 1 ? '' : 's' }}
+      (stopped: {{ fix.stopped_because.split('_').join(' ') }}).
+    </p>
+    @if (savedResumeId(); as id) {
+      <a class="button" [href]="pdfUrl(id)" target="_blank">Download tailored resume (PDF)</a>
+    } @else {
+      <p class="hint">Enable "Save result as tailored version" to get a downloadable PDF.</p>
+    }
+    <details>
+      <summary>Revised resume ({{ fix.revised_resume_markdown.length }} chars)</summary>
+      <pre>{{ fix.revised_resume_markdown }}</pre>
+    </details>
+  </div>
+}
+
+@if (report(); as r) {
+  <div class="report">
+    <div class="score" [class]="scoreLabel(r.match_score)">
+      <span class="value">{{ r.match_score }}</span>
+      <span class="max">/100</span>
+    </div>
+    <p class="summary">{{ r.summary }}</p>
+
+    @if (r.matched_keywords.length) {
+      <section>
+        <h3>Matched keywords</h3>
+        <div class="chips">
+          @for (keyword of r.matched_keywords; track keyword) {
+            <span class="chip matched">{{ keyword }}</span>
+          }
+        </div>
+      </section>
+    }
+
+    @if (r.missing_keywords.length) {
+      <section>
+        <h3>Missing keywords</h3>
+        <ul class="gaps">
+          @for (gap of r.missing_keywords; track gap.keyword) {
+            <li>
+              <span class="chip" [class]="gap.severity">{{ gap.keyword }}</span>
+              <span class="rationale">{{ gap.rationale }}</span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    @if (r.suggestions.length) {
+      <section>
+        <h3>
+          Suggested rewrites
+          <span class="count">{{ acceptedCount() }} of {{ r.suggestions.length }} selected</span>
+        </h3>
+        <ul class="suggestions">
+          @for (suggestion of r.suggestions; track $index) {
+            <li [class.accepted]="isAccepted($index)">
+              <label>
+                <input
+                  type="checkbox"
+                  [checked]="isAccepted($index)"
+                  (change)="toggleSuggestion($index)"
+                />
+                <span class="chip" [class]="suggestion.severity">{{ suggestion.severity }}</span>
+              </label>
+              <div class="diff">
+                @if (suggestion.original_text) {
+                  <p class="before">{{ suggestion.original_text }}</p>
+                }
+                <p class="after">{{ suggestion.suggested_text }}</p>
+                <p class="reason">{{ suggestion.reason }}</p>
+              </div>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  </div>
+} @else if (!scoring() && !fixing()) {
+  <p class="empty">Pick a resume and a target job, then score it.</p>
+}

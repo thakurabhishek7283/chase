@@ -1,0 +1,287 @@
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  background: white;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: #374151;
+    min-width: 200px;
+
+    &.narrow {
+      min-width: 110px;
+    }
+
+    &.checkbox {
+      flex-direction: row;
+      align-items: center;
+      gap: 0.4rem;
+      min-width: auto;
+      padding-bottom: 0.5rem;
+    }
+  }
+
+  select,
+  input[type='number'] {
+    padding: 0.45rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+  }
+
+  button {
+    border: 1px solid #d1d5db;
+    background: white;
+    padding: 0.5rem 1.1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+
+    &.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: white;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}
+
+.empty {
+  color: #6b7280;
+}
+
+.autofix-summary {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+
+  h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+  }
+
+  .button {
+    display: inline-block;
+    background: #2563eb;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .hint {
+    color: #6b7280;
+    font-size: 0.85rem;
+    margin: 0 0 0.75rem 0;
+  }
+
+  pre {
+    background: white;
+    padding: 0.75rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+  }
+}
+
+.report {
+  background: white;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+
+  section {
+    margin-top: 1.5rem;
+  }
+
+  h3 {
+    font-size: 0.95rem;
+    margin: 0 0 0.6rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+
+    .count {
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: #6b7280;
+    }
+  }
+}
+
+.score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+
+  .value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .max {
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+
+  &.strong {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  &.moderate {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.weak {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+}
+
+.summary {
+  color: #374151;
+  margin-top: 0.75rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: #e5e7eb;
+  color: #374151;
+
+  &.matched {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  &.critical {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  &.important {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.nice_to_have {
+    background: #e0e7ff;
+    color: #4338ca;
+  }
+}
+
+.gaps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+
+  .rationale {
+    font-size: 0.85rem;
+    color: #4b5563;
+  }
+}
+
+.suggestions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  li {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    gap: 0.9rem;
+
+    &.accepted {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+
+    > label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      flex-shrink: 0;
+    }
+  }
+
+  .diff {
+    flex: 1;
+
+    p {
+      margin: 0 0 0.3rem 0;
+      font-size: 0.85rem;
+    }
+
+    .before {
+      color: #b91c1c;
+      text-decoration: line-through;
+    }
+
+    .after {
+      color: #15803d;
+    }
+
+    .reason {
+      color: #6b7280;
+      font-size: 0.78rem;
+    }
+  }
+}
