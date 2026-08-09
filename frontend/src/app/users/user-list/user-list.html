@@ -13,6 +13,8 @@
       <tr>
         <th>Name</th>
         <th>Email</th>
+        <th>Role</th>
+        <th>Active</th>
         <th>Current title</th>
         <th></th>
       </tr>
@@ -22,6 +24,8 @@
         <tr>
           <td>{{ user.full_name }}</td>
           <td>{{ user.email }}</td>
+          <td><span class="status" [class]="user.role">{{ user.role }}</span></td>
+          <td>{{ user.is_active ? 'Yes' : 'No' }}</td>
           <td>{{ user.current_title || '—' }}</td>
           <td class="actions">
             <a [routerLink]="[user.id, 'edit']">Edit</a>

@@ -61,9 +61,31 @@ class UnsafeLatexError(ValueError):
     """Raised when a generated fragment is unsafe or malformed."""
 
 
+def allowed_commands_prompt() -> str:
+    """`ALLOWED_COMMANDS` rendered for an LLM prompt: the single source of truth.
+
+    The review and patch-revision prompts used to hardcode their own shorter
+    list, which had already drifted from what `validate_fragment` actually
+    accepts — the model was told a stricter rule than the one enforced, so it
+    under-used formatting the code would have allowed. Generating the sentence
+    from `ALLOWED_COMMANDS` makes that drift structurally impossible.
+    """
+    return ", ".join(f"\\{name}" for name in sorted(ALLOWED_COMMANDS))
+
+
 def escape_text(text: str) -> str:
     """Escape plain text so it survives LaTeX as literal characters."""
     return "".join(_ESCAPES.get(char, char) for char in text)
+
+
+def forbidden_command(text: str) -> str | None:
+    """Return the first structural or file-access command in `text`, if any.
+
+    Exposed for slot discovery, which needs the same judgement about a span the
+    parser *proposed* as this module makes about a fragment the model *wrote*.
+    """
+    match = _FORBIDDEN.search(text)
+    return match.group(1) if match else None
 
 
 def braces_balanced(fragment: str) -> bool:

@@ -5,6 +5,7 @@ from app.services.latex.engines import (
     UnknownEngineError,
     detect_engine,
     incompatibility,
+    pdftex_only_markers,
     required_packages,
     validate_engine,
 )
@@ -28,6 +29,21 @@ LUA = r"""\documentclass{article}
 
 DIRECTLUA = r"""\documentclass{article}
 \begin{document}\directlua{tex.print("hi")}\begin{itemize}\item hi\end{itemize}\end{document}
+"""
+
+#: The opening of the widely-copied "Jake's Résumé" template, which is where
+#: this pairing shows up in practice.
+GLYPHTOUNICODE = r"""\documentclass{article}
+\input{glyphtounicode}
+\pdfgentounicode=1
+\begin{document}\begin{itemize}\item hi\end{itemize}\end{document}
+"""
+
+#: The same document after the fix the error message recommends.
+GUARDED = r"""\documentclass{article}
+\ifdefined\pdfglyphtounicode \input{glyphtounicode} \fi
+\ifdefined\pdfgentounicode \pdfgentounicode=1 \fi
+\begin{document}\begin{itemize}\item hi\end{itemize}\end{document}
 """
 
 
@@ -78,6 +94,54 @@ def test_incompatibility_flags_lua_under_tectonic() -> None:
 @pytest.mark.parametrize("engine", sorted(ENGINE_NAMES))
 def test_a_plain_document_is_compatible_with_every_engine(engine: str) -> None:
     assert incompatibility(PLAIN, engine) is None
+
+
+def test_pdftex_primitives_are_found_and_named() -> None:
+    assert pdftex_only_markers(GLYPHTOUNICODE) == {
+        r"\input{glyphtounicode}",
+        r"\pdfgentounicode",
+    }
+
+
+def test_a_guarded_primitive_is_not_a_requirement() -> None:
+    # `\ifdefined` is the fix the error message recommends; flagging the fixed
+    # document would make the advice impossible to follow.
+    assert pdftex_only_markers(GUARDED) == set()
+    assert incompatibility(GUARDED, "tectonic") is None
+    assert detect_engine(GUARDED, "tectonic") == "tectonic"
+
+
+def test_a_commented_out_primitive_does_not_count() -> None:
+    assert pdftex_only_markers("% \\pdfgentounicode=1\n\\documentclass{article}") == set()
+
+
+@pytest.mark.parametrize("engine", ["tectonic", "xelatex"])
+def test_incompatibility_flags_pdftex_primitives_under_xetex(engine: str) -> None:
+    reason = incompatibility(GLYPHTOUNICODE, engine)
+    assert reason is not None
+    assert "glyphtounicode" in reason
+    # The message has to carry the fix; the engine's own answer is a hundred
+    # lines of log that never mentions `\ifdefined`.
+    assert r"\ifdefined" in reason
+
+
+@pytest.mark.parametrize("engine", ["pdflatex", "latexmk", "lualatex"])
+def test_pdftex_primitives_are_fine_off_xetex(engine: str) -> None:
+    assert incompatibility(GLYPHTOUNICODE, engine) is None
+
+
+def test_detection_moves_a_pdftex_document_off_tectonic() -> None:
+    assert detect_engine(GLYPHTOUNICODE, "tectonic") == "pdflatex"
+    assert detect_engine(GLYPHTOUNICODE, "pdflatex") == "pdflatex"
+
+
+def test_unicode_fonts_outrank_a_glyph_map() -> None:
+    # Unsatisfiable: fontspec needs XeTeX, \pdfgentounicode needs pdfTeX. Losing
+    # the glyph map beats losing the typeface, and the mismatch is still
+    # reported rather than swallowed.
+    both = FONTSPEC.replace(r"\begin{document}", "\\pdfgentounicode=1\n\\begin{document}")
+    assert detect_engine(both, "pdflatex") == "xelatex"
+    assert "pdfgentounicode" in (incompatibility(both, "xelatex") or "")
 
 
 def test_validate_accepts_every_allowlisted_name() -> None:

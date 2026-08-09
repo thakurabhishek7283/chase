@@ -1,52 +1,27 @@
 import uuid
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlmodel import select
 
 from app.core.config import get_settings
-from app.deps import SessionDep
+from app.deps import AdminUser, CurrentUser, SessionDep
 from app.embeddings import EmbeddingError, get_embedding_provider
 from app.models.company import Company
 from app.models.job_profile import JobProfile
 from app.models.user import User
-from app.schemas.matching import JobMatch, ReindexSummary, ResumeParseResult
+from app.schemas.matching import JobMatch, ReindexSummary
 from app.services import matching
-from app.services.pdf_parser import PdfParseError, extract_text, to_markdown
 
 router = APIRouter(tags=["matching"])
 
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-
-
-@router.post("/resumes/parse-pdf", response_model=ResumeParseResult)
-async def parse_resume_pdf(file: UploadFile = File(...)) -> ResumeParseResult:
-    """Extract Markdown text from a resume PDF without persisting anything.
-
-    Kept separate from resume creation so the client can show the user what was
-    extracted and let them correct it before saving.
-    """
-    data = await file.read()
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)}MB limit.",
-        )
-    try:
-        text = extract_text(data)
-    except PdfParseError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-
-    markdown = to_markdown(text)
-    return ResumeParseResult(
-        filename=file.filename or "resume.pdf",
-        character_count=len(markdown),
-        content_markdown=markdown,
-    )
-
 
 @router.post("/matching/reindex", response_model=ReindexSummary)
-async def reindex_embeddings(session: SessionDep) -> ReindexSummary:
-    """(Re)embed every job profile and user career goal.
+async def reindex_embeddings(session: SessionDep, admin: AdminUser) -> ReindexSummary:
+    """(Re)embed every approved job profile and user career goal.
+
+    Admin-only: it walks the entire corpus and spends an embedding call per
+    changed row, which is not a cost any individual user should be able to
+    trigger for the whole instance.
 
     Idempotent — entities whose source text and provider are unchanged are
     skipped without spending an embedding call.
@@ -57,8 +32,11 @@ async def reindex_embeddings(session: SessionDep) -> ReindexSummary:
     except EmbeddingError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
-    jobs = (await session.exec(select(JobProfile))).all()
-    users = (await session.exec(select(User))).all()
+    # Only approved postings are indexed. A pending submission is visible to
+    # its contributor alone, so embedding it would surface an unreviewed row in
+    # every other user's match list.
+    jobs = (await session.exec(select(JobProfile).where(JobProfile.status == "approved"))).all()
+    users = (await session.exec(select(User).where(User.is_active))).all()
 
     try:
         for job in jobs:
@@ -93,15 +71,25 @@ async def reindex_embeddings(session: SessionDep) -> ReindexSummary:
 async def job_matches(
     user_id: uuid.UUID,
     session: SessionDep,
+    current: CurrentUser,
     limit: int = Query(default=10, ge=1, le=50),
 ) -> list[JobMatch]:
-    """Rank job profiles by semantic similarity to the user's career goals.
+    """Rank job profiles by semantic similarity to the caller's career goals.
 
     This is the "companies you should chase" query from the blueprint.
+
+    Self-only — not even admins. Career goals are the most personal field on
+    the user record, and matching them is a service to that user rather than
+    anything moderation needs. The guard here is therefore *not*
+    `require_self_or_admin`: admin is a moderation role in this app, and
+    nothing in moderating shared company data requires reading who wants to
+    leave their job.
     """
-    user = await session.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user_id != current.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    user = current
     if not user.career_goals:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -126,9 +114,19 @@ async def job_matches(
         return []
 
     job_ids = [job_id for job_id, _ in hits]
+    # Re-filter on approval rather than trusting the index. A posting that was
+    # approved when it was embedded may have been rejected since, and the
+    # vector table has no idea.
     jobs = {
         job.id: job
-        for job in (await session.exec(select(JobProfile).where(JobProfile.id.in_(job_ids)))).all()  # type: ignore[attr-defined]
+        for job in (
+            await session.exec(
+                select(JobProfile).where(
+                    JobProfile.id.in_(job_ids),  # type: ignore[attr-defined]
+                    JobProfile.status == "approved",
+                )
+            )
+        ).all()
     }
     company_ids = {job.company_id for job in jobs.values()}
     companies = {

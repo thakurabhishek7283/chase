@@ -1,0 +1,35 @@
+<div class="verdict">
+  <div class="score" [class]="band()">
+    <div class="reading">
+      <span class="value">{{ verdict().match_score }}</span>
+      <span class="max">/100</span>
+    </div>
+    @if (caption()) {
+      <span class="caption">{{ caption() }}</span>
+    }
+  </div>
+  <div class="verdict-text">
+    <p class="summary">{{ verdict().summary }}</p>
+    @if (verdict().matched_keywords.length) {
+      <div class="chips">
+        @for (keyword of verdict().matched_keywords; track keyword) {
+          <span class="chip matched">{{ keyword }}</span>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+@if (verdict().missing_keywords.length) {
+  <div class="gaps">
+    <h4>Not covered</h4>
+    <ul>
+      @for (gap of verdict().missing_keywords; track gap.keyword) {
+        <li>
+          <span class="chip" [class]="gap.severity">{{ gap.keyword }}</span>
+          <span class="rationale">{{ gap.rationale }}</span>
+        </li>
+      }
+    </ul>
+  </div>
+}

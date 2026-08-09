@@ -14,6 +14,9 @@ ever rewrites them.
 
 from dataclasses import dataclass, field
 
+from app.services.latex.config import SlotConfig
+from app.services.latex.fingerprint import slot_hash
+
 
 @dataclass(frozen=True)
 class Span:
@@ -37,6 +40,10 @@ class Bullet:
     span: Span
     latex: str
 
+    @property
+    def content_hash(self) -> str:
+        return slot_hash(self.latex)
+
 
 @dataclass
 class ItemGroup:
@@ -54,6 +61,20 @@ class ItemGroup:
     prefix: str
     suffix: str
     bullets: list[Bullet] = field(default_factory=list)
+    #: True when the group is a bare run of macro calls rather than the body of
+    #: a list environment. The span then covers the calls themselves, so the
+    #: renderer must emit them rather than just their contents.
+    standalone: bool = False
+
+    @property
+    def content_hash(self) -> str:
+        """Fingerprint of the whole list — its bullets, in their current order.
+
+        Built from the bullet hashes rather than the raw span so that reordering
+        the list changes it, which is what a group-level edit actually competes
+        with.
+        """
+        return slot_hash(*(bullet.content_hash for bullet in self.bullets))
 
 
 @dataclass
@@ -70,6 +91,14 @@ class MarkedRegion:
     label: str
     span: Span
     latex: str
+    #: "marker" for `% jarvis:begin`, "field" for one argument of a configured
+    #: macro. The distinction matters to the discovery invariants: an author who
+    #: wrote a marker meant it, while an inferred field slot has to earn trust.
+    origin: str = "marker"
+
+    @property
+    def content_hash(self) -> str:
+        return slot_hash(self.latex)
 
 
 @dataclass
@@ -95,6 +124,10 @@ class LatexResume:
     preamble: Span
     body: Span
     sections: list[Section] = field(default_factory=list)
+    #: The config this document was parsed with. Recorded so a render can
+    #: re-parse its own output the same way to verify the template survived —
+    #: re-parsing with different rules would compare two different documents.
+    config: SlotConfig = field(default_factory=SlotConfig.default)
 
     @property
     def groups(self) -> list[ItemGroup]:

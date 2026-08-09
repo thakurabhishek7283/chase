@@ -1,5 +1,25 @@
 <h2>{{ isEdit() ? 'Edit Company' : 'New Company' }}</h2>
 
+@if (!isEdit()) {
+  <p class="lede">
+    Companies are shared by everyone here. New submissions are reviewed by an administrator —
+    yours is usable straight away while it waits.
+  </p>
+}
+
+@if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+}
+
+@if (existing(); as match) {
+  <p class="duplicate">
+    <strong>{{ match.name }}</strong> is already listed
+    @if (match.status !== 'approved') { ({{ match.status }}) }
+    — use it instead of adding a duplicate.
+    <a [routerLink]="['/jobs/new']">Add a job for it</a>
+  </p>
+}
+
 <form [formGroup]="form" (ngSubmit)="submit()">
   <label>
     Name

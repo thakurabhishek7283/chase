@@ -20,9 +20,15 @@ export class UserForm implements OnInit {
   readonly isEdit = signal(false);
   private userId: string | null = null;
 
+  /** Mirrors `min_password_length` in the backend settings. */
+  readonly minLength = 12;
+
   readonly form = this.fb.nonNullable.group({
     full_name: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
+    // Required when provisioning, irrelevant when editing — the validator is
+    // toggled in ngOnInit rather than duplicating the whole form.
+    password: ['', [Validators.required, Validators.minLength(12)]],
     current_title: [''],
     career_goals: [''],
     desired_salary_min: [''],
@@ -35,6 +41,10 @@ export class UserForm implements OnInit {
     if (id) {
       this.isEdit.set(true);
       this.userId = id;
+      // Passwords are not editable here. Resetting someone else's password is
+      // a separate, deliberate act — not a side effect of fixing their title.
+      this.form.controls.password.clearValidators();
+      this.form.controls.password.updateValueAndValidity();
       this.userService.get(id).subscribe((user) => {
         this.form.patchValue({
           full_name: user.full_name,
@@ -66,7 +76,7 @@ export class UserForm implements OnInit {
 
     const request = this.userId
       ? this.userService.update(this.userId, payload)
-      : this.userService.create(payload);
+      : this.userService.create({ ...payload, password: raw.password });
 
     request.subscribe(() => this.router.navigate(['/users']));
   }

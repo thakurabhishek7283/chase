@@ -13,7 +13,9 @@
       <tr>
         <th>Position</th>
         <th>Company</th>
+        <th>Job ID</th>
         <th>Tier</th>
+        <th>Status</th>
         <th></th>
       </tr>
     </thead>
@@ -22,10 +24,27 @@
         <tr>
           <td>{{ job.position_title }}</td>
           <td>{{ companyName(job.company_id) }}</td>
+          <td>
+            @if (job.external_job_id) {
+              <code>{{ job.external_job_id }}</code>
+            } @else {
+              —
+            }
+          </td>
           <td>{{ job.experience_tier || '—' }}</td>
+          <td>
+            <span class="status" [class]="job.status">{{ job.status }}</span>
+            @if (job.status === 'rejected' && job.rejection_reason) {
+              <div class="reason">{{ job.rejection_reason }}</div>
+            }
+          </td>
           <td class="actions">
-            <a [routerLink]="[job.id, 'edit']">Edit</a>
-            <button type="button" (click)="remove(job.id)">Delete</button>
+            @if (canEdit(job)) {
+              <a [routerLink]="[job.id, 'edit']">Edit</a>
+            }
+            @if (isAdmin()) {
+              <button type="button" (click)="remove(job.id)">Delete</button>
+            }
           </td>
         </tr>
       }

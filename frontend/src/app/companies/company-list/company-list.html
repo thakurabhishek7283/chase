@@ -14,6 +14,7 @@
         <th>Name</th>
         <th>Industry</th>
         <th>Growth</th>
+        <th>Status</th>
         <th></th>
       </tr>
     </thead>
@@ -23,9 +24,19 @@
           <td>{{ company.name }}</td>
           <td>{{ company.industry || '—' }}</td>
           <td>{{ company.growth_trajectory || '—' }}</td>
+          <td>
+            <span class="status" [class]="company.status">{{ company.status }}</span>
+            @if (company.status === 'rejected' && company.rejection_reason) {
+              <div class="reason">{{ company.rejection_reason }}</div>
+            }
+          </td>
           <td class="actions">
-            <a [routerLink]="[company.id, 'edit']">Edit</a>
-            <button type="button" (click)="remove(company.id)">Delete</button>
+            @if (canEdit(company)) {
+              <a [routerLink]="[company.id, 'edit']">Edit</a>
+            }
+            @if (isAdmin()) {
+              <button type="button" (click)="remove(company.id)">Delete</button>
+            }
           </td>
         </tr>
       }

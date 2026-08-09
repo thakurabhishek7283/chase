@@ -1,7 +1,7 @@
 """Resolve the configured LLM provider into a Pydantic AI model.
 
-The ATS scorer, the autofix loop, and the LaTeX tailoring agent are all
-provider-agnostic — they take an `Agent` and never name a vendor. This module is
+The intake, review and revision agents are all provider-agnostic — each takes an
+injectable `Agent` and never names a vendor. This module is
 the single place that decides which vendor those agents talk to, so adding a
 provider means touching this file and the two mappings in `core/config.py`,
 not every agent.

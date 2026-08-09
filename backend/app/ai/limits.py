@@ -1,9 +1,9 @@
 """Survive provider rate limits instead of failing the request.
 
-Gemini's free tier allows 5 requests per minute per model. The autofix loop
-spends two calls per iteration and scored tailoring spends three, so a single
-`/ats/autofix` or `/latex/tailor` call can exhaust a minute's budget on its own
-and 429 halfway through — losing the work already paid for.
+Gemini's free tier allows 5 requests per minute per model. Uploading a resume
+and reviewing it against two roles is three calls inside a minute, and each one
+is expensive enough that a 429 halfway through loses real work — the review
+call in particular reads the whole document and drafts every patch.
 
 Google returns the wait it wants in a `RetryInfo` detail on the error body.
 Honouring that number is strictly better than a guessed backoff: it is the

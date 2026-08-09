@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { AuthService } from '../../core/services/auth.service';
 import { JobProfileService } from '../../core/services/job-profile.service';
 import { CompanyService } from '../../core/services/company.service';
 import { JobProfile } from '../../core/models/job-profile.model';
@@ -16,10 +17,20 @@ import { Company } from '../../core/models/company.model';
 export class JobList implements OnInit {
   private readonly jobProfileService = inject(JobProfileService);
   private readonly companyService = inject(CompanyService);
+  private readonly auth = inject(AuthService);
 
   readonly jobProfiles = signal<JobProfile[]>([]);
   readonly companiesById = signal<Record<string, Company>>({});
   readonly loading = signal(true);
+  /** Deleting a public row is admin-only; editing one is not. */
+  readonly isAdmin = this.auth.isAdmin;
+  readonly isModerator = this.auth.isModerator;
+
+  /** Mirrors the server's `can_edit` — see the note on `CompanyList`. */
+  canEdit(job: JobProfile): boolean {
+    if (this.isModerator()) return true;
+    return job.status === 'pending' && job.created_by === this.auth.currentUser()?.id;
+  }
 
   ngOnInit(): void {
     this.reload();

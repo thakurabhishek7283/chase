@@ -1,0 +1,28 @@
+<div class="score-card">
+  @if (score(); as current) {
+    <app-verdict-view [verdict]="current" [caption]="caption()" />
+
+    @if (current.stale) {
+      <p class="stale">
+        This resume has changed since it was scored. The number above describes the earlier
+        version — score it again for a current one.
+      </p>
+    }
+  } @else {
+    <p class="unscored">
+      This resume has not been scored against that role yet. One quick call reports how it
+      screens — no changes are proposed and nothing is written to the document.
+    </p>
+  }
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  <div class="actions">
+    <button type="button" (click)="run()" [disabled]="busy()">{{ label() }}</button>
+    @if (score(); as current) {
+      <span class="meta">scored {{ current.updated_at | date: 'mediumDate' }}</span>
+    }
+  </div>
+</div>

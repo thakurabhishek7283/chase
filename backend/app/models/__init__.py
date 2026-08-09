@@ -1,9 +1,11 @@
-from app.models.application import Application
+from app.models.audit import AuditLog
 from app.models.company import Company
 from app.models.embedding import EntityEmbedding
 from app.models.job_profile import JobProfile
 from app.models.resume import Resume
-from app.models.technology import CompanyTechnology, JobProfileTechnology, Technology
+from app.models.review import ResumePatch, ResumeReview
+from app.models.score import ResumeScore
+from app.models.session import RefreshToken
 from app.models.user import User
 
 #: Tables that require the pgvector extension. Test fixtures and any
@@ -12,13 +14,14 @@ PGVECTOR_TABLES = {"entity_embeddings"}
 
 __all__ = [
     "PGVECTOR_TABLES",
-    "Application",
+    "AuditLog",
     "Company",
-    "CompanyTechnology",
     "EntityEmbedding",
     "JobProfile",
-    "JobProfileTechnology",
+    "RefreshToken",
     "Resume",
-    "Technology",
+    "ResumePatch",
+    "ResumeReview",
+    "ResumeScore",
     "User",
 ]

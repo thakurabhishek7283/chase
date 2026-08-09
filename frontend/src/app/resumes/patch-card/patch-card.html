@@ -1,0 +1,95 @@
+<article class="patch" [class]="patch().status">
+  <header>
+    <div class="where">
+      <span class="section">{{ patch().section_heading }}</span>
+      <span class="slot">{{ patch().slot_id }}</span>
+      <span class="chip" [class]="patch().severity">{{ patch().severity.split('_').join(' ') }}</span>
+    </div>
+    <span class="status">{{ statusLabel() }}</span>
+  </header>
+
+  <p class="reason">{{ patch().reason }}</p>
+
+  <div class="diff">
+    <div class="side before">
+      <h4>Now</h4>
+      <ul>
+        @for (line of originalLines(); track $index) {
+          <li>{{ line }}</li>
+        } @empty {
+          <li class="empty">(nothing here yet)</li>
+        }
+      </ul>
+    </div>
+    <div class="side after">
+      <h4>Proposed</h4>
+      <ul>
+        @for (line of proposedLines(); track $index) {
+          <li>{{ line }}</li>
+        }
+      </ul>
+    </div>
+  </div>
+
+  @if (patch().revision_count > 0) {
+    <p class="revised">
+      Revised {{ patch().revision_count }}×
+      @if (patch().feedback) {
+        — you asked for: “{{ patch().feedback }}”
+      }
+    </p>
+  }
+
+  @if (!locked()) {
+    <div class="actions">
+      <button
+        type="button"
+        class="accept"
+        [disabled]="busy() || patch().status === 'accepted'"
+        (click)="act.emit({ kind: 'accept' })"
+      >
+        Accept
+      </button>
+      <button
+        type="button"
+        class="reject"
+        [disabled]="busy() || patch().status === 'rejected'"
+        (click)="act.emit({ kind: 'reject' })"
+      >
+        Reject
+      </button>
+      <button type="button" class="ghost" [disabled]="busy()" (click)="toggleFeedback()">
+        {{ showFeedback() ? 'Cancel' : 'Ask for a change' }}
+      </button>
+      @if (patch().revision_count > 0) {
+        <button
+          type="button"
+          class="ghost"
+          [disabled]="busy()"
+          (click)="act.emit({ kind: 'revert' })"
+        >
+          Back to the original suggestion
+        </button>
+      }
+    </div>
+
+    @if (showFeedback()) {
+      <div class="feedback">
+        <textarea
+          rows="3"
+          [ngModel]="draft()"
+          (ngModelChange)="draft.set($event)"
+          placeholder="Too long. Drop the metric — I can't back it up."
+        ></textarea>
+        <button
+          type="button"
+          class="primary"
+          [disabled]="busy() || draft().trim().length < 3"
+          (click)="submitFeedback()"
+        >
+          {{ busy() ? 'Rewriting…' : 'Send it back' }}
+        </button>
+      </div>
+    }
+  }
+</article>

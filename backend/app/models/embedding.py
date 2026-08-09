@@ -13,8 +13,8 @@ def _utcnow() -> datetime:
 
 
 #: Entity kinds that can carry an embedding. Kept as a CHECK-constrained string
-#: (not a native enum) for the same reason as `applications.stage` — widening it
-#: later stays a one-line migration.
+#: rather than a native enum — widening a CHECK later stays a one-line
+#: migration, while `ALTER TYPE … ADD VALUE` is not.
 EMBEDDABLE_ENTITIES = ("user_career_goals", "job_profile", "company", "resume")
 
 

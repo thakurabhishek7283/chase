@@ -1,0 +1,103 @@
+<h2>Your account</h2>
+
+@if (currentUser(); as user) {
+  <p class="lede">
+    Signed in as {{ user.email }}
+    @if (user.role === 'admin') {
+      <span class="badge admin">Administrator</span>
+    } @else if (user.role === 'moderator') {
+      <span class="badge moderator">Moderator</span>
+    }
+  </p>
+}
+
+<section class="card">
+  <h3>Profile</h3>
+
+  @if (profileNotice()) {
+    <p class="notice">{{ profileNotice() }}</p>
+  }
+  @if (profileError()) {
+    <p class="error" role="alert">{{ profileError() }}</p>
+  }
+
+  <form [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+    <label>
+      Full name
+      <input type="text" formControlName="full_name" />
+    </label>
+
+    <label>
+      Email
+      <input type="email" formControlName="email" />
+    </label>
+
+    @if (emailChanged()) {
+      <label>
+        Current password
+        <input
+          type="password"
+          formControlName="current_password"
+          autocomplete="current-password"
+        />
+      </label>
+      <p class="hint">
+        This is the address you sign in with, so changing it needs your password.
+      </p>
+    }
+
+    <label>
+      Current title
+      <input type="text" formControlName="current_title" placeholder="e.g. Senior Backend Engineer" />
+    </label>
+
+    <label>
+      Career goals
+      <textarea
+        formControlName="career_goals"
+        rows="4"
+        placeholder="What you are looking for. This is what job matching ranks against."
+      ></textarea>
+    </label>
+
+    <button type="submit" [disabled]="profileForm.invalid || savingProfile()">
+      {{ savingProfile() ? 'Saving…' : 'Save profile' }}
+    </button>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Password</h3>
+
+  @if (passwordNotice()) {
+    <p class="notice">{{ passwordNotice() }}</p>
+  }
+  @if (passwordError()) {
+    <p class="error" role="alert">{{ passwordError() }}</p>
+  }
+
+  <form [formGroup]="passwordForm" (ngSubmit)="changePassword()">
+    <label>
+      Current password
+      <input type="password" formControlName="current_password" autocomplete="current-password" />
+    </label>
+
+    <label>
+      New password
+      <input type="password" formControlName="new_password" autocomplete="new-password" />
+    </label>
+    <p class="hint">At least {{ minLength }} characters.</p>
+
+    <button type="submit" [disabled]="passwordForm.invalid || savingPassword()">
+      {{ savingPassword() ? 'Changing…' : 'Change password' }}
+    </button>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Sessions</h3>
+  <p class="hint">
+    Signing out clears this device. Changing your password revokes every other session.
+  </p>
+  <button type="button" (click)="signOutEverywhere()">Sign out</button>
+</section>

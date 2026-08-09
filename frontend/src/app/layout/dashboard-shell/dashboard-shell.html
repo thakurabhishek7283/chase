@@ -1,13 +1,28 @@
 <div class="shell">
   <nav class="sidenav">
     <h1 class="brand">Interview Tracker</h1>
-    <a routerLink="/board" routerLinkActive="active">Board</a>
-    <a routerLink="/users" routerLinkActive="active">Users</a>
-    <a routerLink="/companies" routerLinkActive="active">Companies</a>
-    <a routerLink="/jobs" routerLinkActive="active">Jobs</a>
     <a routerLink="/resumes" routerLinkActive="active">Resumes</a>
+    <a routerLink="/jobs" routerLinkActive="active">Jobs</a>
+    <a routerLink="/companies" routerLinkActive="active">Companies</a>
     <a routerLink="/matches" routerLinkActive="active">Chase</a>
-    <a routerLink="/ats" routerLinkActive="active">ATS</a>
+
+    @if (isModerator()) {
+      <span class="section-label">{{ isAdmin() ? 'Admin' : 'Moderation' }}</span>
+      <a routerLink="/moderation" routerLinkActive="active">Moderation</a>
+      @if (isAdmin()) {
+        <a routerLink="/users" routerLinkActive="active">Users</a>
+      }
+    }
+
+    <div class="spacer"></div>
+
+    @if (currentUser(); as user) {
+      <a routerLink="/profile" routerLinkActive="active" class="account">
+        <span class="name">{{ user.full_name }}</span>
+        <span class="email">{{ user.email }}</span>
+      </a>
+      <button type="button" class="logout" (click)="logout()">Sign out</button>
+    }
   </nav>
   <main class="content">
     <router-outlet />

@@ -1,0 +1,65 @@
+<section class="review">
+  <header class="card">
+    <app-verdict-view [verdict]="review()" caption="before these changes" />
+  </header>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  <div class="progress" [class.ready]="ready()">
+    <strong>{{ progress() }}</strong>
+    @if (!ready() && !locked()) {
+      <span>Every proposal needs an answer before the tailored resume can be built.</span>
+      <button type="button" class="ghost" (click)="acceptAll()" [disabled]="!!busyPatchId()">
+        Accept all remaining
+      </button>
+    }
+    @if (locked()) {
+      <span>Finalized — this review is now a record.</span>
+    }
+  </div>
+
+  <div class="patches">
+    @for (patch of review().patches; track patch.id) {
+      <app-patch-card
+        [patch]="patch"
+        [busy]="busyPatchId() === patch.id"
+        [locked]="locked()"
+        (act)="onPatchAction(patch, $event)"
+      />
+    } @empty {
+      <p class="empty">
+        The review proposed no changes. This resume already reads well for that role.
+      </p>
+    }
+  </div>
+
+  @if (ready() && total() > 0) {
+    <div class="output">
+      <h4>{{ acceptedCount() }} of {{ total() }} accepted</h4>
+      <div class="output-actions">
+        <button type="button" (click)="renderPreview()" [disabled]="rendering()">
+          {{ rendering() ? 'Compiling…' : 'Preview PDF' }}
+        </button>
+        <button type="button" (click)="downloadTex()">Download .tex</button>
+
+        @if (!locked()) {
+          <input
+            type="text"
+            [ngModel]="versionLabel()"
+            (ngModelChange)="versionLabel.set($event)"
+            placeholder="Version name (optional)"
+          />
+          <button type="button" class="primary" (click)="finalize()" [disabled]="finalizing()">
+            {{ finalizing() ? 'Saving…' : 'Save as a tailored version' }}
+          </button>
+        }
+      </div>
+
+      @if (previewUrl(); as url) {
+        <iframe class="preview" [src]="url" title="Tailored resume preview"></iframe>
+      }
+    </div>
+  }
+</section>

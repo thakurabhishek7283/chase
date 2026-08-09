@@ -1,26 +1,25 @@
 <h2>Companies to Chase</h2>
 <p class="lede">
-  Ranks open job profiles by how closely they match a user's stated career goals, using vector
+  Ranks open job profiles by how closely they match your stated career goals, using vector
   similarity rather than keyword overlap.
 </p>
 
-<div class="controls">
-  <label>
-    Career goals of
-    <select [ngModel]="selectedUserId()" (ngModelChange)="selectedUserId.set($event)">
-      <option value="" disabled>Select a user</option>
-      @for (user of users(); track user.id) {
-        <option [value]="user.id">{{ user.full_name }}</option>
-      }
-    </select>
-  </label>
+@if (!hasGoals()) {
+  <p class="notice">
+    Set your career goals on your <a routerLink="/profile">profile</a> first — they are what the
+    matching runs against.
+  </p>
+}
 
-  <button type="button" class="primary" (click)="loadMatches()" [disabled]="!selectedUserId() || loading()">
+<div class="controls">
+  <button type="button" class="primary" (click)="loadMatches()" [disabled]="!hasGoals() || loading()">
     {{ loading() ? 'Matching…' : 'Find matches' }}
   </button>
-  <button type="button" (click)="reindex()" [disabled]="reindexing()">
-    {{ reindexing() ? 'Reindexing…' : 'Rebuild index' }}
-  </button>
+  @if (isAdmin()) {
+    <button type="button" (click)="reindex()" [disabled]="reindexing()">
+      {{ reindexing() ? 'Reindexing…' : 'Rebuild index' }}
+    </button>
+  }
 </div>
 
 @if (notice()) {
@@ -50,6 +49,6 @@
       </li>
     }
   </ul>
-} @else if (!loading() && !error()) {
-  <p class="empty">No matches yet. Pick a user and run a match.</p>
+} @else if (!loading() && !error() && hasGoals()) {
+  <p class="empty">No matches yet. Run a match to see openings ranked against your goals.</p>
 }

@@ -6,14 +6,6 @@ from app.schemas.company import CompanyRead
 from app.schemas.job_profile import JobProfileRead
 
 
-class ResumeParseResult(BaseModel):
-    """Text extracted from an uploaded resume PDF, before it is persisted."""
-
-    filename: str
-    character_count: int
-    content_markdown: str
-
-
 class EmbeddingStatus(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

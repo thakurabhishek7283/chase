@@ -1,32 +1,37 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 
-import { AtsService } from '../../core/services/ats.service';
-import { UserService } from '../../core/services/user.service';
-import { JobMatch } from '../../core/models/ats.model';
-import { User } from '../../core/models/user.model';
+import { MatchingService } from '../../core/services/matching.service';
+import { AuthService } from '../../core/services/auth.service';
+import { JobMatch } from '../../core/models/matching.model';
 
 @Component({
   selector: 'app-match-list',
   standalone: true,
-  imports: [FormsModule],
+  imports: [RouterLink],
   templateUrl: './match-list.html',
   styleUrl: './match-list.scss',
 })
 export class MatchList implements OnInit {
-  private readonly atsService = inject(AtsService);
-  private readonly userService = inject(UserService);
+  private readonly matching = inject(MatchingService);
+  private readonly auth = inject(AuthService);
 
-  readonly users = signal<User[]>([]);
-  readonly selectedUserId = signal('');
+  readonly currentUser = this.auth.currentUser;
+  readonly isAdmin = this.auth.isAdmin;
   readonly matches = signal<JobMatch[]>([]);
   readonly loading = signal(false);
   readonly reindexing = signal(false);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
 
+  /** Matching runs against the signed-in user's own career goals. */
+  readonly hasGoals = signal(false);
+
   ngOnInit(): void {
-    this.userService.list().subscribe((users) => this.users.set(users));
+    this.hasGoals.set(Boolean(this.currentUser()?.career_goals));
+    if (this.hasGoals()) {
+      this.loadMatches();
+    }
   }
 
   percent(similarity: number): number {
@@ -37,7 +42,7 @@ export class MatchList implements OnInit {
     this.reindexing.set(true);
     this.error.set(null);
     this.notice.set(null);
-    this.atsService.reindex().subscribe({
+    this.matching.reindex().subscribe({
       next: (summary) => {
         this.notice.set(
           `Indexed ${summary.job_profiles_indexed} job profile(s) and ${summary.users_indexed} user goal(s).`,
@@ -52,12 +57,12 @@ export class MatchList implements OnInit {
   }
 
   loadMatches(): void {
-    const userId = this.selectedUserId();
-    if (!userId) return;
+    const user = this.currentUser();
+    if (!user) return;
     this.loading.set(true);
     this.error.set(null);
     this.notice.set(null);
-    this.atsService.jobMatches(userId).subscribe({
+    this.matching.jobMatches(user.id).subscribe({
       next: (matches) => {
         this.matches.set(matches);
         this.loading.set(false);

@@ -1,8 +1,8 @@
 r"""Project a LaTeX resume down to readable plain text.
 
-The ATS scorer, the autofix loop, and the embedding engine were all built
-against Markdown. Rather than teaching each of them LaTeX, a LaTeX resume is
-flattened once here and fed through the pipeline that already exists.
+The scoring half of the review call reasons about prose, not markup. Rather
+than teaching it LaTeX, a resume is flattened once here and shown to the model
+alongside its slot outline — one view to judge, one view to edit.
 
 The projection is deliberately lossy and one-way. It approximates what an ATS
 extracts from the compiled PDF — text, headings, bullets — which is exactly the
@@ -73,12 +73,28 @@ def _flatten(fragment: str) -> str:
     text = _REMAINING_COMMAND.sub(" ", text)
     for source, target in _UNESCAPE:
         text = text.replace(source, target)
-    # Braces collapse to nothing rather than a space: `\textbf{Languages}:`
+    # Adjacent arguments are separate facts, so they need a separator before the
+    # braces vanish: `\cventry{Acme Corp}{Engineer}` must read "Acme Corp
+    # Engineer", not "Acme CorpEngineer" — an ATS matches neither the run-on
+    # word nor the two keywords hidden inside it.
+    text = text.replace("}{", "} {")
+    # Braces themselves collapse to nothing rather than a space: `\textbf{Languages}:`
     # must read "Languages:", not "Languages :".
     text = text.replace("{", "").replace("}", "")
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r" +([,.;:)])", r"\1", text)
     return "\n".join(line.strip() for line in text.splitlines()).strip(" .,\n")
+
+
+def flatten_latex(source: str) -> str:
+    """Strip markup from raw `.tex` that could not be parsed into sections.
+
+    A last resort for the scoring path: without section structure the output has
+    no headings and no bullet markers, but it is words rather than a preamble
+    full of `\\newcommand` bodies, which is the difference between a rough score
+    and a meaningless one.
+    """
+    return re.sub(r"\n{3,}", "\n\n", _flatten(source)).strip()
 
 
 def to_markdown(resume: LatexResume) -> str:

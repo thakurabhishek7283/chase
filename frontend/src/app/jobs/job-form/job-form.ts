@@ -34,8 +34,13 @@ export class JobForm implements OnInit {
   ];
   private jobProfileId: string | null = null;
 
+  readonly duplicate = signal<string | null>(null);
+
   readonly form = this.fb.nonNullable.group({
     company_id: ['', Validators.required],
+    // With `company_id`, this is the posting's identity. Optional because not
+    // every listing shows one — the server falls back to title + location.
+    external_job_id: [''],
     position_title: ['', Validators.required],
     experience_tier: [''],
     description: ['', Validators.required],
@@ -53,6 +58,7 @@ export class JobForm implements OnInit {
       this.jobProfileService.get(id).subscribe((job) => {
         this.form.patchValue({
           company_id: job.company_id,
+          external_job_id: job.external_job_id ?? '',
           position_title: job.position_title,
           experience_tier: job.experience_tier ?? '',
           description: job.description,
@@ -68,28 +74,41 @@ export class JobForm implements OnInit {
       return;
     }
     const raw = this.form.getRawValue();
+    this.duplicate.set(null);
 
-    if (this.jobProfileId) {
-      this.jobProfileService
-        .update(this.jobProfileId, {
-          position_title: raw.position_title,
-          experience_tier: (raw.experience_tier || null) as ExperienceTier | null,
-          description: raw.description,
-          location: raw.location || null,
-          employment_type: raw.employment_type || null,
-        })
-        .subscribe(() => this.router.navigate(['/jobs']));
-    } else {
-      this.jobProfileService
-        .create({
-          company_id: raw.company_id,
-          position_title: raw.position_title,
-          experience_tier: (raw.experience_tier || null) as ExperienceTier | null,
-          description: raw.description,
-          location: raw.location || null,
-          employment_type: raw.employment_type || null,
-        })
-        .subscribe(() => this.router.navigate(['/jobs']));
+    const payload = {
+      external_job_id: raw.external_job_id.trim() || null,
+      position_title: raw.position_title,
+      experience_tier: (raw.experience_tier || null) as ExperienceTier | null,
+      description: raw.description,
+      location: raw.location || null,
+      employment_type: raw.employment_type || null,
+    };
+
+    const request = this.jobProfileId
+      ? this.jobProfileService.update(this.jobProfileId, payload)
+      : this.jobProfileService.create({ ...payload, company_id: raw.company_id });
+
+    request.subscribe({
+      next: () => void this.router.navigate(['/jobs']),
+      error: (err) => this.duplicate.set(this.conflictMessage(err)),
+    });
+  }
+
+  /**
+   * Turn the 409 body into something actionable.
+   *
+   * The server sends the colliding row along with the message, so the user
+   * learns *which* posting already covers this one rather than just being told
+   * no.
+   */
+  private conflictMessage(err: unknown): string {
+    const response = err as { status?: number; error?: { detail?: unknown } };
+    if (response?.status !== 409) {
+      return 'Could not save this job profile.';
     }
+    const detail = response.error?.detail as { detail?: string } | string | undefined;
+    if (typeof detail === 'string') return detail;
+    return detail?.detail ?? 'A posting with this identity already exists.';
   }
 }

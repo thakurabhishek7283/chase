@@ -1,14 +1,29 @@
 <h2>{{ isEdit() ? 'Edit Job Profile' : 'New Job Profile' }}</h2>
 
+@if (duplicate()) {
+  <p class="error" role="alert">{{ duplicate() }}</p>
+}
+
 <form [formGroup]="form" (ngSubmit)="submit()">
   <label>
     Company
     <select formControlName="company_id">
       <option value="" disabled>Select a company</option>
       @for (company of companies(); track company.id) {
-        <option [value]="company.id">{{ company.name }}</option>
+        <option [value]="company.id">
+          {{ company.name }}@if (company.status !== 'approved') { — {{ company.status }} }
+        </option>
       }
     </select>
+  </label>
+
+  <label>
+    Job / requisition ID
+    <input type="text" formControlName="external_job_id" placeholder="e.g. REQ-10482" />
+    <span class="hint">
+      The employer's own ID for this posting. With the company, it identifies the job and prevents
+      duplicates. Leave blank if the listing doesn't show one.
+    </span>
   </label>
 
   <label>

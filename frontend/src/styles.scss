@@ -1,1 +1,74 @@
 /* You can add global styles to this file, and also import other style files */
+
+/**
+ * Moderation and role badges.
+ *
+ * Global because the same vocabulary appears in the company list, the job
+ * list, the user list, and the moderation queue — four components that would
+ * otherwise each carry their own copy and drift apart.
+ */
+.status {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: #e5e7eb;
+  color: #374151;
+
+  &.approved {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  &.pending {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  &.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  &.admin {
+    background: #ede9fe;
+    color: #5b21b6;
+  }
+
+  &.moderator {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+}
+
+.reason {
+  margin-top: 0.2rem;
+  max-width: 18rem;
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.duplicate {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.35rem;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.88rem;
+}
+
+.error {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.35rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.88rem;
+}
+
+.hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #6b7280;
+}

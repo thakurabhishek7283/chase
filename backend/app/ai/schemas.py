@@ -1,3 +1,15 @@
+"""Model output types shared across the AI seams.
+
+Everything here is either something a model is asked to produce or something
+produced from one.
+
+`ResumeScoreResult` lives here rather than in `ai/score.py` because two agents
+answer it: the scorer returns it alone, and the reviewer returns it with patches
+attached (`ai/review.ResumeReviewResult` subclasses it). That inheritance is the
+point — a verdict shown as "your ATS score" has to mean the same thing whichever
+call produced it, and two hand-kept copies of four fields would eventually not.
+"""
+
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -13,34 +25,20 @@ class MissingKeyword(BaseModel):
     rationale: str = Field(description="One sentence on why this matters for this specific role.")
 
 
-class PhrasingSuggestion(BaseModel):
-    """A concrete, applyable rewrite of one line of the resume."""
+class ResumeScoreResult(BaseModel):
+    """How one resume screens against one job, with nothing proposed about it.
 
-    original_text: str = Field(
-        description=(
-            "The exact text from the resume to replace. Must appear verbatim in the "
-            "resume so the client can locate and apply it. Empty when this is an addition."
-        )
-    )
-    suggested_text: str = Field(description="The replacement text.")
-    reason: str = Field(description="Why this rewrite improves the ATS match.")
-    severity: Severity
+    The scorer's whole output and the first four fields of the reviewer's. It
+    describes the document **as it is** — for a tailored child that means after
+    its patches landed, which is exactly the number the author wants to see.
+    """
 
-
-class ATSReport(BaseModel):
-    """Structured ATS analysis of one resume against one job description."""
-
-    match_score: int = Field(ge=0, le=100, description="Overall ATS match score, 0-100.")
+    match_score: int = Field(ge=0, le=100, description="ATS match for the resume as it is now.")
     summary: str = Field(description="Two or three sentences on the resume's fit for this role.")
     matched_keywords: list[str] = Field(
         default_factory=list, description="Job-description terms the resume already covers well."
     )
     missing_keywords: list[MissingKeyword] = Field(default_factory=list)
-    suggestions: list[PhrasingSuggestion] = Field(default_factory=list)
-
-    @property
-    def critical_gap_count(self) -> int:
-        return sum(1 for keyword in self.missing_keywords if keyword.severity == "critical")
 
 
 class TailoredGroup(BaseModel):
@@ -64,43 +62,12 @@ class TailoredRegion(BaseModel):
 
 
 class ResumeTailoring(BaseModel):
-    """How one resume's editable content should change for one specific role."""
+    """A set of slot edits ready to be spliced into a master.
+
+    Not a model output type any more — the review flow builds one of these from
+    the patches an author accepted. It stays because it is the vocabulary the
+    renderer and the repair loop already speak.
+    """
 
     groups: list[TailoredGroup] = Field(default_factory=list)
     regions: list[TailoredRegion] = Field(default_factory=list)
-    emphasis: list[str] = Field(
-        default_factory=list,
-        description="The skills and themes this pass moved to the front for this role.",
-    )
-    deemphasis: list[str] = Field(
-        default_factory=list,
-        description="Themes that were pushed down or cut because this role does not ask for them.",
-    )
-    notes: str = Field(default="", description="Two or three sentences on the tailoring strategy.")
-
-
-class TailorResult(BaseModel):
-    """Outcome of tailoring a LaTeX master resume for one job."""
-
-    tailored_latex: str
-    tailoring: ResumeTailoring
-    groups_changed: int
-    regions_changed: int
-    #: Present only when scoring was requested; lets the caller show the lift.
-    original_score: int | None = None
-    tailored_score: int | None = None
-    tailored_report: ATSReport | None = None
-
-
-class AutofixResult(BaseModel):
-    """Outcome of the LangGraph analyze -> fix -> re-score loop."""
-
-    original_score: int
-    final_score: int
-    iterations: int
-    revised_resume_markdown: str
-    applied_suggestions: list[PhrasingSuggestion] = Field(default_factory=list)
-    final_report: ATSReport
-    stopped_because: Literal["target_reached", "no_further_gains", "max_iterations"] = Field(
-        description="Why the loop terminated."
-    )

@@ -1,0 +1,161 @@
+<div class="header">
+  <div>
+    <h2>{{ resume()?.title || 'Resume' }}</h2>
+    @if (resume(); as r) {
+      <p class="sub">
+        {{ r.version_label || 'Master' }} ·
+        {{ r.latex_engine || 'server default' }} ·
+        updated {{ r.updated_at | date: 'mediumDate' }}
+        @if (r.master_resume_id; as masterId) {
+          · <a [routerLink]="['/resumes', masterId]">back to the master</a>
+        }
+      </p>
+    }
+  </div>
+  <div class="header-actions">
+    <button type="button" (click)="download('pdf')" [disabled]="downloading()">
+      {{ downloading() ? 'Rendering…' : 'PDF' }}
+    </button>
+    <button type="button" (click)="download('tex')">.tex</button>
+    <a class="button ghost" routerLink="/resumes">All resumes</a>
+  </div>
+</div>
+
+@if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+}
+
+@if (loading()) {
+  <p>Loading…</p>
+} @else if (outline(); as o) {
+  @if (o.engine_warning) {
+    <p class="warning" role="alert">{{ o.engine_warning }}</p>
+  }
+
+  <section class="outline">
+    <header>
+      <h3>What a review may change</h3>
+      <span class="hash" title="Fingerprint of everything outside the editable slots">
+        template {{ shortTemplateHash() }}
+      </span>
+    </header>
+    <p class="counts">
+      {{ o.group_count }} bullet group{{ o.group_count === 1 ? '' : 's' }} ·
+      {{ o.bullet_count }} bullets · {{ o.region_count }} marked region{{ o.region_count === 1 ? '' : 's' }}
+    </p>
+
+    <div class="sections">
+      @for (section of editableSections(); track section.id) {
+        <div class="section">
+          <h4>{{ section.heading }}</h4>
+          @for (group of section.groups; track group.id) {
+            <ul>
+              @for (bullet of group.bullets; track bullet.id) {
+                <li>{{ bullet.latex }}</li>
+              }
+            </ul>
+          }
+          @for (region of section.regions; track region.id) {
+            <p class="region" [class.inferred]="region.origin === 'field'">
+              {{ region.latex }}
+            </p>
+          }
+        </div>
+      } @empty {
+        <p class="empty">
+          Nothing in this document is editable. Correct the slot configuration below, or add
+          <code>% jarvis:begin</code> markers around the parts a review may rewrite.
+        </p>
+      }
+    </div>
+
+    @if (o.frozen_sections.length) {
+      <p class="frozen">Frozen: {{ o.frozen_sections.join(', ') }}</p>
+    }
+  </section>
+
+  <app-slot-config-editor
+    [resumeId]="resumeId()"
+    [outline]="o"
+    (changed)="onOutlineChanged($event)"
+  />
+}
+
+<section class="start">
+  <h3>ATS score against a role</h3>
+  <div class="start-controls">
+    <select [ngModel]="selectedJobId()" (ngModelChange)="selectedJobId.set($event)">
+      <option value="" disabled>Select a job profile</option>
+      @for (job of jobProfiles(); track job.id) {
+        <option [value]="job.id">{{ job.position_title }}</option>
+      }
+    </select>
+    <button type="button" class="primary" (click)="startReview()" [disabled]="!canReview()">
+      {{ starting() ? 'Scoring and drafting…' : 'Review and improve' }}
+    </button>
+  </div>
+
+  @if (selectedJobId()) {
+    <app-score-panel
+      [resumeId]="resumeId()"
+      [jobProfileId]="selectedJobId()"
+      [score]="selectedScore()"
+      (scored)="onScored($event)"
+    />
+  }
+
+  <p class="hint">
+    Scoring only reports how this resume screens. <strong>Review and improve</strong> is the
+    one model call that also drafts every change worth making — you accept, reject or send
+    back each one, and nothing is written until they are all resolved.
+    @if (isChild()) {
+      Reviewing this version again is how its score gets raised; the result is saved as
+      another version of the same master.
+    }
+  </p>
+</section>
+
+@if (activeReview(); as review) {
+  <app-review-panel
+    [review]="review"
+    (changed)="onReviewChanged($event)"
+    (finalized)="onFinalized()"
+  />
+}
+
+@if (history().length) {
+  <section class="history">
+    <h3>Earlier reviews</h3>
+    <ul>
+      @for (row of history(); track row.id) {
+        <li>
+          <button type="button" class="link" (click)="openReview(row.id)">
+            {{ jobTitle(row.job_profile_id) }}
+          </button>
+          <span class="meta">
+            scored {{ row.match_score }} · {{ row.created_at | date: 'mediumDate' }} ·
+            @if (row.status === 'finalized') {
+              finalized
+            } @else {
+              {{ row.pending_count }} still open
+            }
+          </span>
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+@if (versions().length) {
+  <section class="versions">
+    <h3>{{ isChild() ? 'Other versions' : 'Tailored versions' }}</h3>
+    <ul>
+      @for (version of versions(); track version.id) {
+        <li>
+          <a [routerLink]="['/resumes', version.id]">{{ version.version_label || 'Tailored' }}</a>
+          <span class="meta">{{ version.created_at | date: 'mediumDate' }}</span>
+        </li>
+      }
+    </ul>
+  </section>
+}

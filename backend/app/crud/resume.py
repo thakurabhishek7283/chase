@@ -1,30 +1,23 @@
 import uuid
-from datetime import datetime, timezone
 
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.resume import Resume
-from app.schemas.resume import ResumeCreate, ResumeUpdate
 
 
-async def create_resume(session: AsyncSession, data: ResumeCreate) -> Resume:
-    resume = Resume(**data.model_dump())
-    session.add(resume)
-    await session.commit()
-    await session.refresh(resume)
-    return resume
+async def list_resumes(session: AsyncSession, user_id: uuid.UUID) -> list[Resume]:
+    """Every resume belonging to one user, masters before their children.
 
-
-async def list_resumes(
-    session: AsyncSession, user_id: uuid.UUID | None = None, master_only: bool = False
-) -> list[Resume]:
-    query = select(Resume)
-    if user_id is not None:
-        query = query.where(Resume.user_id == user_id)
-    if master_only:
-        query = query.where(Resume.master_resume_id.is_(None))  # type: ignore[union-attr]
-    result = await session.exec(query)
+    `user_id` is required rather than optional: an omitted filter used to mean
+    "all resumes from every account", which is not a query this API should be
+    able to express.
+    """
+    result = await session.exec(
+        select(Resume)
+        .where(Resume.user_id == user_id)
+        .order_by(col(Resume.master_resume_id).nulls_first(), col(Resume.created_at))
+    )
     return list(result.all())
 
 
@@ -32,21 +25,36 @@ async def get_resume(session: AsyncSession, resume_id: uuid.UUID) -> Resume | No
     return await session.get(Resume, resume_id)
 
 
-async def list_resume_versions(session: AsyncSession, master_resume_id: uuid.UUID) -> list[Resume]:
-    result = await session.exec(select(Resume).where(Resume.master_resume_id == master_resume_id))
+async def list_resume_versions(
+    session: AsyncSession, master_resume_id: uuid.UUID, *, user_id: uuid.UUID
+) -> list[Resume]:
+    result = await session.exec(
+        select(Resume).where(
+            Resume.master_resume_id == master_resume_id, Resume.user_id == user_id
+        )
+    )
     return list(result.all())
 
 
-async def update_resume(session: AsyncSession, resume: Resume, data: ResumeUpdate) -> Resume:
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(resume, field, value)
-    resume.updated_at = datetime.now(timezone.utc)
-    session.add(resume)
-    await session.commit()
-    await session.refresh(resume)
-    return resume
-
-
 async def delete_resume(session: AsyncSession, resume: Resume) -> None:
+    """Delete a resume, and its tailored children if it is a master.
+
+    The children go first and explicitly. `resumes.master_resume_id` is a
+    self-referential FK with no cascade — adding one would mean a self-cascading
+    delete, which Postgres allows but which makes "delete this row" a recursive
+    operation that is easy to trigger by accident. Doing it here keeps the blast
+    radius visible at the call site.
+
+    Reviews of this master *do* cascade at the database level; a review of a
+    document that no longer exists could never be finalized.
+    """
+    children = await session.exec(select(Resume).where(Resume.master_resume_id == resume.id))
+    for child in children.all():
+        await session.delete(child)
+    # Flushed before the parent goes. Both deletes in one flush would be ordered
+    # by SQLAlchemy's own dependency sort, which knows nothing about a
+    # self-referential FK declared only as a column — so the parent can go first
+    # and Postgres rejects the whole statement.
+    await session.flush()
     await session.delete(resume)
     await session.commit()

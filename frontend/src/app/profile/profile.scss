@@ -1,0 +1,104 @@
+.lede {
+  color: #6b7280;
+  margin-top: -0.5rem;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+
+  &.admin {
+    background: #ede9fe;
+    color: #5b21b6;
+  }
+
+  &.moderator {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+}
+
+.card {
+  max-width: 34rem;
+  margin-bottom: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.5rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+
+  h3 {
+    margin-top: 0;
+    font-size: 1rem;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  input,
+  textarea {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.35rem;
+    font: inherit;
+    font-weight: 400;
+  }
+
+  button {
+    align-self: flex-start;
+    padding: 0.5rem 0.9rem;
+    border: 0;
+    border-radius: 0.35rem;
+    background: #2563eb;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.hint {
+  margin: -0.4rem 0 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.notice {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.35rem;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 0.85rem;
+}
+
+.error {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.35rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}

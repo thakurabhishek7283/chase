@@ -1,0 +1,139 @@
+<section class="slots">
+  <header>
+    <div>
+      <h3>Template vocabulary</h3>
+      <span class="source" [class]="outline().slot_config.source">{{ sourceLabel() }}</span>
+    </div>
+    <div class="header-actions">
+      <button type="button" (click)="toggle()">
+        {{ open() ? 'Hide' : 'Edit' }}
+      </button>
+    </div>
+  </header>
+
+  @if (needsReview()) {
+    <div class="review">
+      <p>
+        <strong>This boundary was inferred, not agreed.</strong>
+        These macros decide what tailoring may rewrite. Check that nothing
+        holding an employer, a title, or a date is listed as content — then
+        confirm it.
+      </p>
+      <div class="review-actions">
+        <button type="button" class="primary" (click)="confirmAsIs()" [disabled]="busy()">
+          Looks right — confirm
+        </button>
+        <button type="button" (click)="toggle()">Review the macros</button>
+      </div>
+    </div>
+  }
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  @if (open()) {
+    <div class="editor">
+      <div class="group">
+        <h4>
+          Bullet macros
+          <span class="hint">One argument, holding one bullet: <code>\achievement&#123;…&#125;</code></span>
+        </h4>
+        @for (macro of config().bullet_macros; track $index) {
+          <div class="row">
+            <span class="slash">\</span>
+            <input
+              type="text"
+              placeholder="achievement"
+              [ngModel]="macro.name"
+              (ngModelChange)="setBulletMacro($index, $event)"
+            />
+            <button type="button" class="remove" (click)="removeBulletMacro($index)">Remove</button>
+          </div>
+        }
+        <button type="button" class="add" (click)="addBulletMacro()">+ Add bullet macro</button>
+      </div>
+
+      <div class="group">
+        <h4>
+          Field macros
+          <span class="hint">
+            Several arguments, one of them prose:
+            <code>\cventry&#123;employer&#125;&#123;title&#125;&#123;dates&#125;&#123;prose&#125;</code>
+            is arity 4, content argument 4. Every argument you do not name stays frozen.
+          </span>
+        </h4>
+        @for (macro of config().field_macros; track $index) {
+          <div class="row field">
+            <span class="slash">\</span>
+            <input
+              type="text"
+              placeholder="cventry"
+              [ngModel]="macro.name"
+              (ngModelChange)="setFieldMacro($index, 'name', $event)"
+            />
+            <label>
+              arity
+              <input
+                type="number"
+                min="1"
+                max="9"
+                [ngModel]="macro.arity"
+                (ngModelChange)="setFieldNumber($index, 'arity', $event)"
+              />
+            </label>
+            <label>
+              content arg
+              <input
+                type="number"
+                min="1"
+                max="9"
+                [ngModel]="macro.content_arg"
+                (ngModelChange)="setFieldNumber($index, 'content_arg', $event)"
+              />
+            </label>
+            <input
+              class="label"
+              type="text"
+              placeholder="label"
+              [ngModel]="macro.label"
+              (ngModelChange)="setFieldMacro($index, 'label', $event)"
+            />
+            <button type="button" class="remove" (click)="removeFieldMacro($index)">Remove</button>
+          </div>
+        }
+        <button type="button" class="add" (click)="addFieldMacro()">+ Add field macro</button>
+      </div>
+
+      <div class="group">
+        <h4>Section macros <span class="hint">Comma separated, no backslash</span></h4>
+        <input
+          type="text"
+          class="wide"
+          [ngModel]="joined('section_macros')"
+          (ngModelChange)="setList('section_macros', $event)"
+        />
+      </div>
+
+      <div class="group">
+        <h4>List environments <span class="hint">Beyond itemize and enumerate</span></h4>
+        <input
+          type="text"
+          class="wide"
+          [ngModel]="joined('environments')"
+          (ngModelChange)="setList('environments', $event)"
+        />
+      </div>
+
+      <div class="editor-actions">
+        <button type="button" class="primary" (click)="save()" [disabled]="busy()">
+          {{ busy() ? 'Saving…' : 'Save and confirm' }}
+        </button>
+        <button type="button" (click)="discard()" [disabled]="busy()">Discard changes</button>
+        <button type="button" class="danger" (click)="reset()" [disabled]="busy()">
+          Reset to built-in shapes
+        </button>
+      </div>
+    </div>
+  }
+</section>

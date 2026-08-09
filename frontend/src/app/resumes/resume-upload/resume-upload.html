@@ -1,0 +1,82 @@
+<div class="header">
+  <h2>Upload a resume</h2>
+  <a class="button ghost" routerLink="/resumes">Cancel</a>
+</div>
+
+@if (resumeId()) {
+  <section class="landed">
+    <h3>Stored, with {{ corrections().length }} correction{{ corrections().length === 1 ? '' : 's' }}</h3>
+    @if (verdict()) {
+      <p class="verdict">{{ verdict() }}</p>
+    }
+    <p class="hint">
+      Your file did not compile as submitted. These are the changes made to it — the
+      stored master is the corrected version.
+    </p>
+    <ul class="corrections">
+      @for (correction of corrections(); track $index) {
+        <li>
+          <p class="reason">{{ correction.reason }}</p>
+          <pre class="before">{{ correction.find }}</pre>
+          <pre class="after">{{ correction.replace }}</pre>
+        </li>
+      }
+    </ul>
+    <button type="button" class="primary" (click)="open()">Open this resume</button>
+  </section>
+} @else {
+  <form class="upload" (ngSubmit)="upload()">
+    <label>
+      Title
+      <input
+        type="text"
+        [ngModel]="title()"
+        (ngModelChange)="title.set($event)"
+        name="title"
+        placeholder="Backend engineer master"
+        required
+      />
+    </label>
+
+    <label>
+      LaTeX file
+      <input type="file" accept=".tex" (change)="onFileSelected($event)" name="file" />
+      <span class="hint">
+        <code>.tex</code> only. It is read once, corrected if it will not build, and
+        compiled to prove it works before anything is stored.
+      </span>
+    </label>
+
+    <label>
+      Engine
+      <select [ngModel]="engine()" (ngModelChange)="engine.set($event)" name="engine">
+        <option value="">Server default ({{ status()?.engine || 'tectonic' }})</option>
+        @for (name of installedEngines(); track name) {
+          <option [value]="name">{{ name }}</option>
+        }
+      </select>
+      <span class="hint">
+        Fixed once uploaded — the corrections are made for this engine specifically.
+      </span>
+    </label>
+
+    @if (status(); as engineStatus) {
+      @if (!engineStatus.available) {
+        <p class="error" role="alert">{{ engineStatus.detail }}</p>
+      }
+    }
+
+    @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+    }
+
+    <div class="actions">
+      <button type="submit" class="primary" [disabled]="!canUpload()">
+        {{ uploading() ? 'Reading and compiling…' : 'Upload' }}
+      </button>
+      @if (uploading()) {
+        <span class="hint">This takes a few seconds — one model call, then a real compile.</span>
+      }
+    </div>
+  </form>
+}

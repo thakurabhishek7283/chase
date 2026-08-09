@@ -2,12 +2,18 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from app.schemas.auth import Password
 
 
 class UserCreate(BaseModel):
+    """Admin-side provisioning. Ordinary signup goes through `/auth/register`."""
+
     full_name: str
     email: EmailStr
+    password: Password
+    role: str | None = Field(default=None, pattern="^(user|moderator|admin)$")
     current_title: str | None = None
     career_goals: str | None = None
     desired_salary_min: Decimal | None = None
@@ -31,6 +37,8 @@ class UserRead(BaseModel):
     id: uuid.UUID
     full_name: str
     email: str
+    role: str
+    is_active: bool
     current_title: str | None
     career_goals: str | None
     desired_salary_min: Decimal | None

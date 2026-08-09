@@ -1,39 +1,61 @@
 <div class="header">
   <h2>Resumes</h2>
-  <a class="button" routerLink="new">+ New Resume</a>
+  <a class="button" routerLink="upload">Upload a .tex</a>
 </div>
+
+@if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+}
 
 @if (loading()) {
   <p>Loading…</p>
-} @else if (resumes().length === 0) {
-  <p>No resumes yet.</p>
+} @else if (masters().length === 0) {
+  <p class="empty">
+    No resumes yet. Upload a <code>.tex</code> master to get started — it is read,
+    corrected if it will not build, and compiled before it is stored.
+  </p>
 } @else {
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Owner</th>
-        <th>Version</th>
-        <th>Master?</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (resume of resumes(); track resume.id) {
-        <tr>
-          <td>{{ resume.title }}</td>
-          <td>{{ userName(resume.user_id) }}</td>
-          <td>{{ resume.version_label || '—' }}</td>
-          <td>{{ resume.master_resume_id ? 'No' : 'Yes' }}</td>
-          <td class="actions">
-            <a [routerLink]="[resume.id, 'edit']">Edit</a>
-            @if (resume.content_format === 'markdown') {
-              <a [href]="pdfUrl(resume.id)" target="_blank">Download PDF</a>
+  <ul class="masters">
+    @for (master of masters(); track master.id) {
+      <li class="master">
+        <div class="row">
+          <a class="title" [routerLink]="[master.id]">{{ master.title }}</a>
+          <span class="meta">{{ master.latex_engine || 'server default' }}</span>
+          <div class="actions">
+            <button
+              type="button"
+              (click)="downloadPdf(master)"
+              [disabled]="downloading() === master.id"
+            >
+              {{ downloading() === master.id ? 'Rendering…' : 'PDF' }}
+            </button>
+            <button type="button" class="danger" (click)="remove(master.id)">Delete</button>
+          </div>
+        </div>
+
+        @if (versionsOf(master.id).length) {
+          <ul class="versions">
+            @for (version of versionsOf(master.id); track version.id) {
+              <li class="row">
+                <a class="title" [routerLink]="[version.id]">
+                  {{ version.version_label || 'Tailored' }}
+                </a>
+                <span class="meta">tailored version</span>
+                <div class="actions">
+                  <button
+                    type="button"
+                    (click)="downloadPdf(version)"
+                    [disabled]="downloading() === version.id"
+                  >
+                    {{ downloading() === version.id ? 'Rendering…' : 'PDF' }}
+                  </button>
+                  <button type="button" class="danger" (click)="remove(version.id)">Delete</button>
+                </div>
+              </li>
             }
-            <button type="button" (click)="remove(resume.id)">Delete</button>
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
+          </ul>
+        }
+      </li>
+    }
+  </ul>
 }

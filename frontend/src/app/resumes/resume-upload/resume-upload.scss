@@ -1,0 +1,147 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.button {
+  background: #2563eb;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.9rem;
+
+  &.ghost {
+    background: none;
+    color: #4b5563;
+    border: 1px solid #d1d5db;
+  }
+}
+
+.upload,
+.landed {
+  background: white;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  max-width: 40rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+
+  input[type='text'],
+  select {
+    font-weight: 400;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.95rem;
+  }
+}
+
+.hint {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: #6b7280;
+
+  code {
+    background: #f3f4f6;
+    padding: 0.05rem 0.25rem;
+    border-radius: 3px;
+  }
+}
+
+.error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+button.primary {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+  }
+}
+
+.landed {
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .verdict {
+    margin: 0;
+    color: #374151;
+    font-size: 0.9rem;
+  }
+}
+
+.corrections {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+
+  li {
+    border-left: 3px solid #f59e0b;
+    padding-left: 0.8rem;
+  }
+
+  .reason {
+    margin: 0 0 0.4rem;
+    font-size: 0.9rem;
+    color: #374151;
+  }
+
+  pre {
+    margin: 0 0 0.3rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .before {
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
+  .after {
+    background: #f0fdf4;
+    color: #166534;
+  }
+}

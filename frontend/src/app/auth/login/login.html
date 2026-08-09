@@ -1,0 +1,27 @@
+<div class="auth-page">
+  <form class="auth-card" [formGroup]="form" (ngSubmit)="submit()">
+    <h1>Sign in</h1>
+
+    @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+    }
+
+    <label>
+      Email
+      <input type="email" formControlName="email" autocomplete="username" />
+    </label>
+
+    <label>
+      Password
+      <input type="password" formControlName="password" autocomplete="current-password" />
+    </label>
+
+    <button type="submit" [disabled]="form.invalid || submitting()">
+      {{ submitting() ? 'Signing in…' : 'Sign in' }}
+    </button>
+
+    <p class="alt">
+      No account? <a routerLink="/register">Create one</a>
+    </p>
+  </form>
+</div>

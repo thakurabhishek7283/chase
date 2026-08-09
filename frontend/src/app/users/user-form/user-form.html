@@ -11,6 +11,14 @@
     <input type="email" formControlName="email" />
   </label>
 
+  @if (!isEdit()) {
+    <label>
+      Initial password
+      <input type="password" formControlName="password" autocomplete="new-password" />
+      <span class="hint">At least {{ minLength }} characters. The user can change it later.</span>
+    </label>
+  }
+
   <label>
     Current title
     <input type="text" formControlName="current_title" />

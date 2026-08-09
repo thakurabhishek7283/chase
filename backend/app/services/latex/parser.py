@@ -1,15 +1,27 @@
 r"""Split a master `.tex` into a frozen template half and an editable half.
 
-Two extraction strategies, mirroring the dual-library philosophy of
-`services/pdf_parser` — cover the common case automatically, and give the author
-an escape hatch for everything else:
+Four extraction strategies, on one principle — cover the common case
+automatically, and give the author an escape hatch for everything else:
 
-1. **Bullets, found automatically.** `\item` bodies inside `itemize`/`enumerate`,
-   and `\resumeItem{...}` bodies inside `\resumeItemListStart`/`End` (the shape
-   used by the widely-copied "Jake's resume" template).
+1. **Bullets in lists, found automatically.** `\item` bodies inside
+   `itemize`/`enumerate`, and `\resumeItem{...}` bodies inside
+   `\resumeItemListStart`/`End` (the shape used by the widely-copied "Jake's
+   resume" template).
 
-2. **Marked regions, opted into explicitly.** Anything wrapped in
+2. **Standalone bullet macros.** A run of consecutive `\achievement{...}` calls
+   with nothing but whitespace between them is a bullet list whether or not the
+   template wrapped it in an environment.
+
+3. **Field arguments.** One named argument of a multi-argument macro —
+   `\cventry{employer}{title}{dates}{prose}` yields a slot over the prose alone.
+
+4. **Marked regions, opted into explicitly.** Anything wrapped in
    `% jarvis:begin <label>` … `% jarvis:end`.
+
+Which macros count for (2) and (3) comes from the `SlotConfig` the caller
+supplies — that is what lets an unseen template be parsed without code changes.
+The *mechanism* stays entirely deterministic either way: spans are computed by
+brace matching, never guessed.
 
 Everything else is frozen. That boundary is a deliberate content decision, not
 just a parsing convenience: bullets and skill lines are what *should* change
@@ -19,6 +31,7 @@ are facts, and a tailoring pass must never be in a position to rewrite them.
 
 import re
 
+from app.services.latex.config import SlotConfig
 from app.services.latex.model import (
     Bullet,
     ItemGroup,
@@ -32,18 +45,6 @@ from app.services.latex.model import (
 class LatexParseError(ValueError):
     """Raised when a `.tex` file cannot be understood well enough to tailor."""
 
-
-#: List environments whose `\item`s are editable.
-_ITEM_ENVIRONMENTS = {"itemize", "enumerate", "itemize*", "enumerate*"}
-
-#: Macro-delimited list "environments" used by popular resume templates.
-_MACRO_LIST_PAIRS = {
-    r"\resumeItemListStart": r"\resumeItemListEnd",
-    r"\cvItemListStart": r"\cvItemListEnd",
-}
-
-#: Item macros whose sole braced argument is the bullet text.
-_BRACE_ITEM_MACROS = ("resumeItem", "cvItem")
 
 _ENV_TOKEN = re.compile(r"\\(begin|end)\s*\{([A-Za-z@*]+)\}")
 _ITEM_TOKEN = re.compile(r"\\item\b(\s*\[[^\]]*\])?")
@@ -148,10 +149,11 @@ def _scan_environments(masked: str, offset: int = 0) -> list[tuple[str, int, int
     return found
 
 
-def _scan_macro_lists(masked: str) -> list[tuple[str, int, int, int, int]]:
+def _scan_macro_lists(masked: str, config: SlotConfig) -> list[tuple[str, int, int, int, int]]:
     """Match the macro-delimited list pairs, same shape as `_scan_environments`."""
     found: list[tuple[str, int, int, int, int]] = []
-    for start_macro, end_macro in _MACRO_LIST_PAIRS.items():
+    for pair in config.list_pairs:
+        start_macro, end_macro = "\\" + pair.start, "\\" + pair.end
         opens = [m.end() for m in re.finditer(re.escape(start_macro) + r"(?![A-Za-z])", masked)]
         closes = [m.start() for m in re.finditer(re.escape(end_macro) + r"(?![A-Za-z])", masked)]
         # Pair them innermost-first so nesting cannot cross-link two lists.
@@ -166,9 +168,11 @@ def _scan_macro_lists(masked: str) -> list[tuple[str, int, int, int, int]]:
     return found
 
 
-def _bullets_in(source: str, masked: str, body: Span, group_id: str) -> tuple[list[Bullet], str, str]:
+def _bullets_in(
+    source: str, masked: str, body: Span, group_id: str, config: SlotConfig
+) -> tuple[list[Bullet], str, str]:
     """Extract item bodies from a list body, returning them with their idiom."""
-    for macro in _BRACE_ITEM_MACROS:
+    for macro in config.bullet_macro_names:
         pattern = re.compile(r"\\" + macro + r"\s*(?=\{)")
         starts = [m.end() for m in pattern.finditer(masked, body.start, body.end)]
         if starts:
@@ -191,10 +195,14 @@ def _bullets_in(source: str, masked: str, body: Span, group_id: str) -> tuple[li
 
 
 def _find_marked_regions(source: str) -> list[MarkedRegion]:
-    """Pair `% jarvis:begin <label>` with the next `% jarvis:end`."""
+    """Pair `% jarvis:begin <label>` with the next `% jarvis:end`.
+
+    Ids are placeholders: regions are renumbered in document order once the
+    config-derived field slots have been merged in.
+    """
     ends = [m for m in _MARKER_END.finditer(source)]
     regions: list[MarkedRegion] = []
-    for number, begin in enumerate(_MARKER_BEGIN.finditer(source), start=1):
+    for begin in _MARKER_BEGIN.finditer(source):
         end = next((e for e in ends if e.start() >= begin.end()), None)
         if end is None:
             raise LatexParseError(
@@ -203,12 +211,142 @@ def _find_marked_regions(source: str) -> list[MarkedRegion]:
         span = _strip_span(source, begin.end(), end.start())
         regions.append(
             MarkedRegion(
-                id=f"r{number}",
-                label=begin.group(1).strip(),
-                span=span,
-                latex=span.text(source),
+                id="", label=begin.group(1).strip(), span=span, latex=span.text(source)
             )
         )
+    return regions
+
+
+def _braced_args(masked: str, index: int, count: int) -> list[tuple[int, int]] | None:
+    """Locate `count` consecutive braced arguments starting at `index`.
+
+    Returns `(open, close)` index pairs, or None when the macro is not followed
+    by that many arguments — a call that does not match its declared arity is
+    skipped rather than fatal, because one odd usage should not cost the author
+    the rest of the document.
+    """
+    spans: list[tuple[int, int]] = []
+    cursor, length = index, len(masked)
+    for _ in range(count):
+        while cursor < length and masked[cursor] in " \t\r\n":
+            cursor += 1
+        optional = _OPTIONAL_ARG.match(masked, cursor)
+        if optional:
+            cursor = optional.end()
+            while cursor < length and masked[cursor] in " \t\r\n":
+                cursor += 1
+        if cursor >= length or masked[cursor] != "{":
+            return None
+        try:
+            close = match_brace(masked, cursor)
+        except LatexParseError:
+            return None
+        spans.append((cursor, close))
+        cursor = close + 1
+    return spans
+
+
+def _overlaps_any(span: Span, taken: list[Span]) -> bool:
+    return any(span.overlaps(other) for other in taken)
+
+
+def _standalone_runs(
+    source: str, masked: str, body: Span, config: SlotConfig, taken: list[Span], first_id: int
+) -> list[ItemGroup]:
+    r"""Find runs of consecutive bullet-macro calls that no list environment claimed.
+
+    `\achievement{a}\achievement{b}` with only whitespace between them is a
+    bullet list even though nothing wrapped it in one. Requiring whitespace-only
+    separation is what makes replacing the whole run safe: anything else between
+    two calls is template, and template is not ours to overwrite.
+    """
+    groups: list[ItemGroup] = []
+    number = first_id
+    for name in config.bullet_macro_names:
+        pattern = re.compile(r"\\" + name + r"(?![A-Za-z@])")
+        #: (whole call including the macro name, the argument's inner text)
+        calls: list[tuple[Span, Span]] = []
+        for match in pattern.finditer(masked, body.start, body.end):
+            args = _braced_args(masked, match.end(), 1)
+            if args is None:
+                continue
+            open_index, close_index = args[0]
+            if close_index >= body.end:
+                continue
+            call = Span(match.start(), close_index + 1)
+            if _overlaps_any(call, taken):
+                continue
+            calls.append((call, _strip_span(source, open_index + 1, close_index)))
+
+        for run in _contiguous_runs(source, calls):
+            number += 1
+            groups.append(_run_group(source, name, run, f"g{number}"))
+    return groups
+
+
+def _contiguous_runs(
+    source: str, calls: list[tuple[Span, Span]]
+) -> list[list[tuple[Span, Span]]]:
+    """Split calls into runs separated by nothing but whitespace."""
+    runs: list[list[tuple[Span, Span]]] = []
+    current: list[tuple[Span, Span]] = []
+    for call, inner in calls:
+        if current and source[current[-1][0].end : call.start].strip():
+            runs.append(current)
+            current = []
+        current.append((call, inner))
+    if current:
+        runs.append(current)
+    return runs
+
+
+def _run_group(
+    source: str, name: str, run: list[tuple[Span, Span]], group_id: str
+) -> ItemGroup:
+    """Build a standalone group whose span covers the macro calls themselves."""
+    bullets = [
+        Bullet(id=f"{group_id}-b{number}", span=inner, latex=inner.text(source))
+        for number, (_call, inner) in enumerate(run, start=1)
+    ]
+    return ItemGroup(
+        id=group_id,
+        kind=name,
+        span=Span(run[0][0].start, run[-1][0].end),
+        indent=_indent_before(source, run[0][0].start) or "    ",
+        prefix=f"\\{name}{{",
+        suffix="}",
+        bullets=bullets,
+        standalone=True,
+    )
+
+
+def _field_regions(
+    source: str, masked: str, body: Span, config: SlotConfig, taken: list[Span]
+) -> list[MarkedRegion]:
+    r"""Carve one editable argument out of each multi-argument macro call.
+
+    `\cventry{Google}{Engineer}{2021--Now}{prose}` yields a slot over the prose
+    and nothing else, so the employer and the dates are not merely asked to stay
+    put — they are outside every editable span in the document.
+    """
+    regions: list[MarkedRegion] = []
+    for macro in config.field_macros:
+        pattern = re.compile(r"\\" + macro.name + r"(?![A-Za-z@])")
+        for match in pattern.finditer(masked, body.start, body.end):
+            args = _braced_args(masked, match.end(), macro.arity)
+            if args is None:
+                continue
+            open_index, close_index = args[macro.content_arg - 1]
+            if close_index >= body.end:
+                continue
+            span = _strip_span(source, open_index + 1, close_index)
+            if span.end <= span.start or _overlaps_any(span, taken):
+                continue
+            regions.append(
+                MarkedRegion(
+                    id="", label=macro.label, span=span, latex=span.text(source), origin="field"
+                )
+            )
     return regions
 
 
@@ -234,8 +372,12 @@ def _find_sections(source: str, masked: str, body: Span, macros: list[str]) -> l
     return sections
 
 
-def parse(source: str, section_macros: list[str] | None = None) -> LatexResume:
-    """Parse a master `.tex` into its frozen template and editable content."""
+def parse(source: str, config: SlotConfig | None = None) -> LatexResume:
+    """Parse a master `.tex` into its frozen template and editable content.
+
+    `config` decides which macros carry content in *this* document; omitting it
+    uses the built-in shapes, which is what an ordinary `\\item` resume needs.
+    """
     if not source.strip():
         raise LatexParseError("The uploaded .tex file is empty.")
 
@@ -250,16 +392,17 @@ def parse(source: str, section_macros: list[str] | None = None) -> LatexResume:
     if body.end <= body.start:
         raise LatexParseError("The document body is empty.")
 
-    macros = section_macros or ["section", "subsection"]
-    sections = _find_sections(source, masked, body, macros)
+    active = (config or SlotConfig.default()).validate()
+    sections = _find_sections(source, masked, body, list(active.section_macros))
     regions = _find_marked_regions(source)
 
+    list_names = {pair.start for pair in active.list_pairs}
     candidates = [
         (name, begin_start, body_start, body_end, end_stop)
         for (name, begin_start, body_start, body_end, end_stop) in (
-            _scan_environments(masked, body.start) + _scan_macro_lists(masked)
+            _scan_environments(masked, body.start) + _scan_macro_lists(masked, active)
         )
-        if name in _ITEM_ENVIRONMENTS or name in {m.lstrip("\\") for m in _MACRO_LIST_PAIRS}
+        if name in active.environments or name in list_names
         if body.start <= begin_start and end_stop <= body.end
     ]
     candidates.sort(key=lambda item: item[1])
@@ -275,7 +418,7 @@ def parse(source: str, section_macros: list[str] | None = None) -> LatexResume:
         group_body = Span(body_start, body_end)
         number += 1
         group_id = f"g{number}"
-        bullets, prefix, suffix = _bullets_in(source, masked, group_body, group_id)
+        bullets, prefix, suffix = _bullets_in(source, masked, group_body, group_id, active)
         if not bullets:
             number -= 1
             continue
@@ -295,6 +438,26 @@ def parse(source: str, section_macros: list[str] | None = None) -> LatexResume:
     # for the escape hatch precisely to take control of that span.
     groups = [g for g in groups if not any(g.span.overlaps(r.span) for r in regions)]
 
+    # Configured macros fill in where the list scan found nothing. Both passes
+    # are handed every span already claimed, so a bullet cannot be discovered
+    # twice and a field cannot be carved out of a group's text.
+    taken = [g.span for g in groups] + [r.span for r in regions]
+    groups += _standalone_runs(source, masked, body, active, taken, len(groups))
+    taken = [g.span for g in groups] + [r.span for r in regions]
+    regions += _field_regions(source, masked, body, active, taken)
+
+    # Renumber in document order. Ids are what the model and the client address
+    # slots by, so "g2 is the second list in the resume" has to stay true no
+    # matter which pass discovered it.
+    groups.sort(key=lambda group: group.span.start)
+    regions.sort(key=lambda region: region.span.start)
+    for number, group in enumerate(groups, start=1):
+        group.id = f"g{number}"
+        for index, bullet in enumerate(group.bullets, start=1):
+            bullet.id = f"{group.id}-b{index}"
+    for number, region in enumerate(regions, start=1):
+        region.id = f"r{number}"
+
     for section in sections:
         section.groups = [g for g in groups if section.span.start <= g.span.start < section.span.end]
         section.regions = [
@@ -302,7 +465,11 @@ def parse(source: str, section_macros: list[str] | None = None) -> LatexResume:
         ]
 
     resume = LatexResume(
-        source=source, preamble=Span(0, begin_doc.start()), body=body, sections=sections
+        source=source,
+        preamble=Span(0, begin_doc.start()),
+        body=body,
+        sections=sections,
+        config=active,
     )
     if not resume.groups and not resume.regions:
         raise LatexParseError(

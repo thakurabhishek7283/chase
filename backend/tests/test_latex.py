@@ -3,22 +3,40 @@ from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from app.ai.schemas import ResumeTailoring
-from app.ai.tailor import TAILOR_SYSTEM_PROMPT, build_outline, tailor_content
+from app.ai.schemas import ResumeTailoring, TailoredGroup, TailoredRegion
+from app.ai.slot_schema import ProposedBulletMacro, ProposedFieldMacro, SlotSchema
+from app.ai.review import REVIEW_SYSTEM_PROMPT, build_outline
 from app.services.latex import (
+    BulletMacro,
+    FieldMacro,
     GroupEdit,
     LatexParseError,
     LatexRenderError,
     RegionEdit,
+    SlotConfig,
+    SlotConfigError,
+    Span,
+    StaleEditError,
+    TemplateDriftError,
     UnsafeLatexError,
     parse,
     render,
+    slot_hashes,
+    template_hash,
     to_markdown,
 )
+from app.services.latex.fingerprint import frozen_chunks
+from app.services.slot_discovery import (
+    SlotDiscoveryError,
+    check_invariants,
+    to_slot_config,
+)
 from app.services.latex.safety import braces_balanced, coerce_fragment, escape_text, validate_fragment
-from app.services.tailoring import tailor_latex_resume
+from app.services.tailoring import apply_tailoring
 
-SECTION_MACROS = ["section", "subsection"]
+#: Every `parse()` in this file goes through the built-in shapes; the
+#: configurable ones get their own section at the bottom.
+SECTION_MACROS = SlotConfig.default(["section", "subsection"])
 
 MASTER = r"""\documentclass[letterpaper,11pt]{article}
 \usepackage[margin=0.6in]{geometry}
@@ -203,6 +221,279 @@ def test_render_output_reparses() -> None:
     assert parse(tailored, SECTION_MACROS).bullet_count == 1
 
 
+# --- fingerprints ------------------------------------------------------------
+
+
+def test_template_hash_ignores_content_but_not_scaffolding() -> None:
+    resume = _parsed()
+    tailored = render(resume, group_edits=[GroupEdit("g1", ["Something else entirely."])])
+
+    # Rewriting every bullet leaves the template hash alone...
+    assert template_hash(parse(tailored, SECTION_MACROS)) == template_hash(resume)
+    # ...but touching a single byte of the frozen half does not.
+    drifted = MASTER.replace("margin=0.6in", "margin=0.4in")
+    assert template_hash(parse(drifted, SECTION_MACROS)) != template_hash(resume)
+
+
+def test_frozen_chunks_exclude_every_editable_slot() -> None:
+    frozen = "".join(frozen_chunks(_parsed()))
+
+    assert r"\usepackage[margin=0.6in]{geometry}" in frozen
+    assert r"\textbf{B.Tech}, State University" in frozen
+    assert "Mentored four engineers." not in frozen
+    assert "Python, Go, SQL" not in frozen
+
+
+def test_slot_hash_survives_rewrapping_but_not_rewording() -> None:
+    # Reflowing a long \item across two lines is an editing habit, not an edit.
+    rewrapped = MASTER.replace(
+        r"    \item Mentored four engineers.",
+        "    \\item Mentored\n        four engineers.",
+    )
+    assert slot_hashes(parse(rewrapped, SECTION_MACROS)) == slot_hashes(_parsed())
+
+    reworded = MASTER.replace("Mentored four engineers.", "Mentored five engineers.")
+    assert slot_hashes(parse(reworded, SECTION_MACROS)) != slot_hashes(_parsed())
+
+
+def test_group_hash_changes_when_its_bullets_are_reordered() -> None:
+    # A group-level edit competes with a reorder, so a reorder must invalidate it.
+    resume = _parsed()
+    reordered = render(
+        resume,
+        group_edits=[
+            GroupEdit("g1", [b.latex for b in reversed(resume.groups[0].bullets)])
+        ],
+    )
+    assert parse(reordered, SECTION_MACROS).groups[0].content_hash != resume.groups[0].content_hash
+
+
+def test_render_rejects_an_edit_written_against_stale_content() -> None:
+    # The hazard this exists for: ids are positional, so an edit generated
+    # against an older master would otherwise splice into whatever 'g1' is now.
+    stale = slot_hashes(_parsed())
+    edited_master = MASTER.replace("Mentored four engineers.", "Mentored a whole team.")
+
+    with pytest.raises(StaleEditError, match="has changed since"):
+        render(
+            parse(edited_master, SECTION_MACROS),
+            group_edits=[GroupEdit("g1", ["Shipped Rust."])],
+            base_hashes=stale,
+        )
+
+
+def test_render_accepts_an_edit_whose_hashes_still_match() -> None:
+    resume = _parsed()
+    tailored = render(
+        resume,
+        group_edits=[GroupEdit("g1", ["Shipped Rust."])],
+        region_edits=[RegionEdit("r1", r"\textbf{Languages}: Rust")],
+        base_hashes=slot_hashes(resume),
+    )
+    assert "Shipped Rust." in tailored
+
+
+def test_render_applies_slots_the_caller_supplied_no_hash_for() -> None:
+    # A partial map must not be read as "everything else is stale".
+    resume = _parsed()
+    tailored = render(
+        resume,
+        group_edits=[GroupEdit("g1", ["Shipped Rust."])],
+        base_hashes={"r1": resume.regions[0].content_hash},
+    )
+    assert "Shipped Rust." in tailored
+
+
+def test_template_drift_is_caught_and_the_output_discarded() -> None:
+    # Simulate the bug the check exists for: a span computed one byte too wide,
+    # so the splice eats the \end{itemize} that closes the list.
+    resume = _parsed()
+    group = resume.groups[0]
+    group.span = Span(group.span.start, group.span.end + len(r"\end{itemize}"))
+
+    with pytest.raises(TemplateDriftError):
+        render(resume, group_edits=[GroupEdit("g1", ["One bullet."])])
+
+
+# --- configurable templates ---------------------------------------------------
+
+#: A template the built-in shapes cannot read: no itemize, no \resumeItem, and
+#: the employer/title/dates arriving as arguments to a custom macro.
+CUSTOM = r"""\documentclass{article}
+\newcommand{\achievement}[1]{\item #1}
+\newcommand{\cventry}[4]{\textbf{#1} \hfill #3 \\ \textit{#2} \\ #4}
+\begin{document}
+\section{Experience}
+\cventry{Acme Corp}{Senior Engineer}{2021 -- Present}{Led the platform team.}
+    \achievement{Designed a multi-tenant pipeline handling 40k events/sec.}
+    \achievement{Cut p99 latency by 38\% using a work queue.}
+\section{Education}
+\textbf{B.Tech}, State University \hfill 2018
+\end{document}
+"""
+
+CUSTOM_CONFIG = SlotConfig(
+    section_macros=("section",),
+    bullet_macros=(BulletMacro("achievement"),),
+    field_macros=(FieldMacro("cventry", arity=4, content_arg=4, label="experience"),),
+)
+
+
+def test_builtin_shapes_cannot_read_a_custom_template() -> None:
+    # The gap the whole slot-config feature exists to close.
+    with pytest.raises(LatexParseError, match="No editable content"):
+        parse(CUSTOM, SECTION_MACROS)
+
+
+def test_config_finds_standalone_runs_and_field_arguments() -> None:
+    resume = parse(CUSTOM, CUSTOM_CONFIG)
+
+    assert resume.bullet_count == 2
+    group = resume.groups[0]
+    assert group.standalone
+    assert [b.latex for b in group.bullets] == [
+        "Designed a multi-tenant pipeline handling 40k events/sec.",
+        r"Cut p99 latency by 38\% using a work queue.",
+    ]
+    assert [(r.label, r.latex, r.origin) for r in resume.regions] == [
+        ("experience", "Led the platform team.", "field")
+    ]
+
+
+def test_a_field_macro_freezes_every_argument_it_did_not_name() -> None:
+    # The truthfulness guarantee for custom templates: naming argument 4 puts
+    # the employer, the title and the dates outside every editable span, so
+    # nothing in the pipeline can reach them.
+    frozen = "".join(frozen_chunks(parse(CUSTOM, CUSTOM_CONFIG)))
+
+    assert "Acme Corp" in frozen
+    assert "Senior Engineer" in frozen
+    assert "2021 -- Present" in frozen
+    assert "Led the platform team." not in frozen
+
+
+def test_a_standalone_run_is_rewritten_without_disturbing_the_template() -> None:
+    resume = parse(CUSTOM, CUSTOM_CONFIG)
+    tailored = render(
+        resume,
+        group_edits=[GroupEdit("g1", ["Shipped Rust services.", "Ran the on-call rotation."])],
+        region_edits=[RegionEdit("r1", "Led the platform team of six.")],
+    )
+
+    assert tailored.count(r"\achievement{") == 2
+    assert "Shipped Rust services." in tailored
+    assert "Led the platform team of six." in tailored
+    assert r"\cventry{Acme Corp}{Senior Engineer}{2021 -- Present}{" in tailored
+    # The definitions and the frozen half survive the splice.
+    assert template_hash(parse(tailored, CUSTOM_CONFIG)) == template_hash(resume)
+    assert tailored.split(r"\begin{document}")[0] == CUSTOM.split(r"\begin{document}")[0]
+
+
+def test_a_run_broken_by_template_text_is_two_groups() -> None:
+    # Only whitespace may separate the calls in a run. Anything else is template,
+    # and replacing across it would overwrite bytes that are not ours.
+    source = CUSTOM.replace(
+        r"    \achievement{Cut p99",
+        "    \\textit{Selected work:}\n    \\achievement{Cut p99",
+    )
+    resume = parse(source, CUSTOM_CONFIG)
+
+    assert [len(group.bullets) for group in resume.groups] == [1, 1]
+    assert r"\textit{Selected work:}" in "".join(frozen_chunks(resume))
+
+
+def test_no_op_render_of_a_custom_template_is_byte_identical() -> None:
+    assert render(parse(CUSTOM, CUSTOM_CONFIG)) == CUSTOM
+
+
+@pytest.mark.parametrize("name", ["documentclass", "begin", "item", "newcommand", "section"])
+def test_slot_config_refuses_structural_macros(name: str) -> None:
+    with pytest.raises(SlotConfigError, match="structural"):
+        SlotConfig(bullet_macros=(BulletMacro(name),)).validate()
+
+
+@pytest.mark.parametrize("name", ["textbf", "emph", "href", "textcolor"])
+def test_slot_config_refuses_inline_formatting_as_a_slot(name: str) -> None:
+    # Declaring \textbf a bullet macro would make every bold run in the document
+    # editable and nest slots inside each other.
+    with pytest.raises(SlotConfigError, match="inline formatting"):
+        SlotConfig(bullet_macros=(BulletMacro(name),)).validate()
+
+
+def test_slot_config_refuses_a_content_argument_it_does_not_have() -> None:
+    with pytest.raises(SlotConfigError, match="only takes"):
+        SlotConfig(field_macros=(FieldMacro("cventry", arity=2, content_arg=4),)).validate()
+
+
+def test_slot_config_round_trips_through_json() -> None:
+    # It is stored as JSONB and re-validated on the way back out.
+    restored = SlotConfig.from_dict(CUSTOM_CONFIG.validate().to_dict())
+    assert restored == CUSTOM_CONFIG.validate()
+    assert SlotConfig.from_dict(None) is None
+
+
+# --- slot discovery -----------------------------------------------------------
+
+
+def test_a_multi_argument_bullet_macro_is_demoted_to_a_field() -> None:
+    # The model told us where the prose is and only got the packaging wrong; a
+    # bullet is reorderable and this one has siblings the renderer cannot
+    # invent, so it becomes a field rather than being thrown away.
+    schema = SlotSchema(
+        bullet_macros=[
+            ProposedBulletMacro(name="achievement"),
+            ProposedBulletMacro(name="cvline", arity=2, content_arg=2),
+        ],
+    )
+    config = to_slot_config(schema, ["section"])
+
+    assert "achievement" in config.bullet_macro_names
+    assert "cvline" not in config.bullet_macro_names
+    assert ("cvline", 2, 2) in [(m.name, m.arity, m.content_arg) for m in config.field_macros]
+
+
+def test_a_discovered_boundary_is_never_self_confirmed() -> None:
+    schema = SlotSchema(
+        bullet_macros=[ProposedBulletMacro(name="achievement")],
+        field_macros=[ProposedFieldMacro(name="cventry", arity=4, content_arg=4, label="exp")],
+    )
+    config = to_slot_config(schema, ["section"])
+
+    assert [(m.name, m.content_arg) for m in config.field_macros] == [("cventry", 4)]
+    assert config.source == "discovered"
+    assert config.confirmed is False
+
+
+def test_discovery_keeps_the_builtin_shapes_alongside_the_proposal() -> None:
+    # A template with a custom bullet macro very often still has a plain itemize.
+    config = to_slot_config(SlotSchema(bullet_macros=[ProposedBulletMacro(name="achievement")]), [])
+    assert "resumeItem" in config.bullet_macro_names
+    assert "itemize" in config.environments
+
+
+def test_discovery_refuses_a_proposal_that_claims_most_of_the_document() -> None:
+    prose = "Built and operated distributed systems for many teams. " * 8
+    source = (
+        "\\documentclass{article}\n\\begin{document}\n\\section{Summary}\n"
+        f"\\everything{{{prose}}}\n\\end{{document}}\n"
+    )
+    config = SlotConfig(field_macros=(FieldMacro("everything", arity=1, content_arg=1),))
+
+    with pytest.raises(SlotDiscoveryError, match="editable"):
+        check_invariants(parse(source, config), config)
+
+
+def test_discovery_refuses_a_slot_holding_document_structure() -> None:
+    source = (
+        "\\documentclass{article}\n\\begin{document}\n\\section{Skills}\n"
+        "\\block{\\begin{tabular}{ll} Python & Go \\end{tabular}}\n\\end{document}\n"
+    )
+    config = SlotConfig(field_macros=(FieldMacro("block", arity=1, content_arg=1),))
+
+    with pytest.raises(SlotDiscoveryError, match="structural command"):
+        check_invariants(parse(source, config), config)
+
+
 # --- safety ------------------------------------------------------------------
 
 
@@ -255,12 +546,16 @@ def test_projection_keeps_bullets_frozen_prose_and_headings() -> None:
     assert "\\" not in markdown
 
 
-# --- tailoring ---------------------------------------------------------------
+def test_projection_separates_adjacent_macro_arguments() -> None:
+    # `\cventry{Acme Corp}{Senior Engineer}` must not flatten to one run-on
+    # word: an ATS matches neither "CorpSenior" nor the keywords inside it.
+    markdown = to_markdown(parse(CUSTOM, CUSTOM_CONFIG))
+
+    assert "Acme Corp Senior Engineer 2021 - Present" in markdown
+    assert "CorpSenior" not in markdown
 
 
-def test_tailor_system_prompt_forbids_fabrication() -> None:
-    # Safety property of the feature, not a style choice.
-    assert "NEVER invent skills" in TAILOR_SYSTEM_PROMPT
+# --- splicing reviewed content -----------------------------------------------
 
 
 def test_outline_exposes_slots_but_never_the_preamble() -> None:
@@ -273,71 +568,51 @@ def test_outline_exposes_slots_but_never_the_preamble() -> None:
     assert "Education" not in outline  # Frozen sections are not offered up.
 
 
-def _tailoring_model(payload: dict) -> FunctionModel:
-    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, payload)])
-
-    return FunctionModel(respond)
+def test_review_system_prompt_forbids_fabrication() -> None:
+    # Safety property of the feature, not a style choice.
+    assert "NEVER invent skills" in REVIEW_SYSTEM_PROMPT
 
 
-_PAYLOAD = {
-    "groups": [
-        {
-            "group_id": "g1",
-            "items": [
+_ACCEPTED = ResumeTailoring(
+    groups=[
+        TailoredGroup(
+            group_id="g1",
+            items=[
                 r"Designed a \textbf{Rust} pipeline handling 40k events/sec.",
                 r"Cut p99 latency by 38\% using a work queue.",
             ],
-        }
+        )
     ],
-    "regions": [{"region_id": "r1", "latex": r"\textbf{Languages}: Rust, Python, Go"}],
-    "emphasis": ["Rust"],
-    "deemphasis": ["mentoring"],
-    "notes": "Led with systems work.",
-}
+    regions=[TailoredRegion(region_id="r1", latex=r"\textbf{Languages}: Rust, Python, Go")],
+)
 
 
-async def test_tailor_content_drops_hallucinated_slot_ids() -> None:
-    payload = {**_PAYLOAD, "groups": [*_PAYLOAD["groups"], {"group_id": "g42", "items": ["x"]}]}
-    agent = Agent(_tailoring_model(payload), output_type=ResumeTailoring)
+def test_accepted_patches_splice_without_touching_the_template() -> None:
+    tailored = apply_tailoring(MASTER, _ACCEPTED, SECTION_MACROS)
 
-    tailoring = await tailor_content(_parsed(), "Rust role", "Rust Engineer", agent=agent)
-
-    assert [g.group_id for g in tailoring.groups] == ["g1"]
-
-
-async def test_tailor_latex_resume_splices_without_touching_the_template() -> None:
-    agent = Agent(_tailoring_model(_PAYLOAD), output_type=ResumeTailoring)
-
-    result = await tailor_latex_resume(
-        MASTER, "We need Rust.", "Rust Engineer", SECTION_MACROS, tailor_agent=agent
-    )
-
-    assert result.groups_changed == 1
-    assert result.regions_changed == 1
-    assert r"\textbf{Rust} pipeline" in result.tailored_latex
-    assert r"\textbf{Languages}: Rust, Python, Go" in result.tailored_latex
+    assert r"\textbf{Rust} pipeline" in tailored
+    assert r"\textbf{Languages}: Rust, Python, Go" in tailored
     # Dropped bullet is gone; frozen facts and preamble are untouched.
-    assert "Mentored four engineers" not in result.tailored_latex
-    assert result.tailored_latex.split(r"\begin{document}")[0] == MASTER.split(
-        r"\begin{document}"
-    )[0]
-    assert r"\textbf{B.Tech}, State University \hfill 2018" in result.tailored_latex
+    assert "Mentored four engineers" not in tailored
+    assert tailored.split(r"\begin{document}")[0] == MASTER.split(r"\begin{document}")[0]
+    assert r"\textbf{B.Tech}, State University \hfill 2018" in tailored
 
 
-async def test_tailoring_sanitises_unsafe_model_output() -> None:
-    payload = {
-        "groups": [{"group_id": "g1", "items": [r"Shipped \input{/etc/passwd} services"]}],
-        "regions": [],
-        "emphasis": [],
-        "deemphasis": [],
-        "notes": "",
-    }
-    agent = Agent(_tailoring_model(payload), output_type=ResumeTailoring)
+def test_an_unaccepted_slot_keeps_the_masters_own_text() -> None:
+    # Rejecting a patch is the absence of an edit, not an edit that undoes one:
+    # a slot the splicer is not given comes through byte-for-byte.
+    only_region = ResumeTailoring(regions=list(_ACCEPTED.regions))
+    tailored = apply_tailoring(MASTER, only_region, SECTION_MACROS)
 
-    result = await tailor_latex_resume(
-        MASTER, "Rust.", "Rust Engineer", SECTION_MACROS, tailor_agent=agent
+    assert "Mentored four engineers." in tailored
+    assert r"\textbf{Languages}: Rust, Python, Go" in tailored
+
+
+def test_splicing_sanitises_unsafe_model_output() -> None:
+    unsafe = ResumeTailoring(
+        groups=[TailoredGroup(group_id="g1", items=[r"Shipped \input{/etc/passwd} services"])]
     )
+    tailored = apply_tailoring(MASTER, unsafe, SECTION_MACROS)
 
-    assert r"\input" not in result.tailored_latex
-    assert "Shipped" in result.tailored_latex
+    assert r"\input" not in tailored
+    assert "Shipped" in tailored
