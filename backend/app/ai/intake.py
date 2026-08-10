@@ -41,7 +41,7 @@ You process an uploaded LaTeX resume in one pass. You do two jobs at once.
 You are told which engine will compile this document. Report every construct \
 that engine cannot run, as a `find`/`replace` correction.
 
-The engine matters. XeTeX-based engines (tectonic, xelatex) do not have pdfTeX's \
+The engine matters. XeTeX-based engines (xelatex) do not have pdfTeX's \
 `\\pdf...` primitives: `\\pdfgentounicode`, `\\pdfglyphtounicode`, and \
 `\\input{glyphtounicode}` all stop the run with "Undefined control sequence". \
 The fix is to make them conditional, never to delete the author's line:

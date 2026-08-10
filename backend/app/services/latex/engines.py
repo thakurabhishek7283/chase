@@ -17,21 +17,20 @@ from typing import Literal
 
 from app.services.latex.parser import mask_comments
 
-EngineName = Literal["tectonic", "latexmk", "pdflatex", "xelatex", "lualatex"]
+EngineName = Literal["latexmk", "pdflatex", "xelatex", "lualatex"]
 
 #: The only names accepted from a request. Widening this means widening the
 #: `ck_resumes_latex_engine` CHECK constraint in a migration too.
 ENGINE_NAMES: frozenset[str] = frozenset(
-    {"tectonic", "latexmk", "pdflatex", "xelatex", "lualatex"}
+    {"latexmk", "pdflatex", "xelatex", "lualatex"}
 )
 
-#: Engines built on a Unicode TeX. Tectonic qualifies: it is XeTeX-based, so it
-#: handles `fontspec` and friends natively.
-UNICODE_ENGINES: frozenset[str] = frozenset({"tectonic", "xelatex", "lualatex"})
+#: Engines built on a Unicode TeX — handle `fontspec` and friends natively.
+UNICODE_ENGINES: frozenset[str] = frozenset({"xelatex", "lualatex"})
 
 #: Engines built on XeTeX, which is the family that lacks pdfTeX's `\pdf...`
 #: primitives. LuaTeX is Unicode *and* keeps them, so it is deliberately absent.
-XETEX_ENGINES: frozenset[str] = frozenset({"tectonic", "xelatex"})
+XETEX_ENGINES: frozenset[str] = frozenset({"xelatex"})
 
 #: Packages that simply do not work under pdfLaTeX.
 _UNICODE_ONLY_PACKAGES = {
@@ -159,7 +158,7 @@ def incompatibility(source: str, engine: str) -> str | None:
     if unicode_only and engine not in UNICODE_ENGINES:
         return (
             f"This document loads {', '.join(sorted(unicode_only))}, which needs a "
-            f"Unicode engine (tectonic, xelatex, or lualatex). '{engine}' is selected."
+            f"Unicode engine (xelatex or lualatex). '{engine}' is selected."
         )
 
     pdftex_only = pdftex_only_markers(source)

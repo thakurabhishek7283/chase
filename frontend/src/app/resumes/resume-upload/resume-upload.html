@@ -50,7 +50,7 @@
     <label>
       Engine
       <select [ngModel]="engine()" (ngModelChange)="engine.set($event)" name="engine">
-        <option value="">Server default ({{ status()?.engine || 'tectonic' }})</option>
+        <option value="">Server default ({{ status()?.engine || 'pdflatex' }})</option>
         @for (name of installedEngines(); track name) {
           <option [value]="name">{{ name }}</option>
         }

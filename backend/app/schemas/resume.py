@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 #: Mirrors ENGINE_NAMES in services/latex/engines.py. A Literal rather than a
 #: free string because the value is executed as a subprocess.
-LatexEngine = Literal["tectonic", "latexmk", "pdflatex", "xelatex", "lualatex"]
+LatexEngine = Literal["latexmk", "pdflatex", "xelatex", "lualatex"]
 
 
 # --- the document ----------------------------------------------------------

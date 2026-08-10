@@ -162,14 +162,17 @@ class Settings(BaseSettings):
         return LLM_PROVIDER_ENV_VAR[self.llm_provider]
 
     # --- LaTeX ---------------------------------------------------------------
-    # Every engine runs inside the `docker/latex/Dockerfile` image rather than
-    # being installed on the host — see services/latex/compiler.py. Tectonic is
-    # the default engine because it fetches the packages a document needs on
-    # first compile rather than requiring a full TeX Live scheme up front.
-    latex_default_engine: str = "tectonic"
-    #: Image tag `compiler.py` runs. Build it once with
-    #: `docker build -t jarvis-latex:latest backend/docker/latex`.
-    latex_docker_image: str = "jarvis-latex:latest"
+    # Every engine runs inside a separate worker service rather than being
+    # installed on this host — see services/latex/compiler.py and
+    # latex-worker/server.py. pdflatex is the default: fastest, and what most
+    # LaTeX templates assume; detect_engine() upgrades a specific document to
+    # xelatex/lualatex only when it actually needs one (services/latex/engines.py).
+    latex_default_engine: str = "pdflatex"
+    #: Where the LaTeX worker service listens. docker-compose.yml points this
+    #: at the `latex-worker` service; for native development, start the image
+    #: as a standalone container publishing 8100 and this default is correct
+    #: unchanged. See services/latex/compiler.py.
+    latex_worker_url: str = "http://localhost:8100"
     latex_compile_timeout_seconds: int = 120
     #: Upload ceiling for a .tex master. Resumes are a few tens of KB; anything
     #: far larger is a pasted book, not a resume.

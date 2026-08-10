@@ -1,0 +1,70 @@
+# One-command way to run the whole stack: `docker compose up --build`.
+#
+# Code is baked into the backend/frontend images at build time, not bind-
+# mounted — this is meant to be the "clone it and it just works" path, not a
+# hot-reload dev loop. After changing backend/ or frontend/ code, re-run with
+# `--build`. For active development, `README.md`'s native uv/npm setup still
+# gives you reload-on-save.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: jarvis_dev_password
+      POSTGRES_DB: jarvis
+    ports:
+      - "5432:5432"
+    volumes:
+      # pg18's image stores data under /var/lib/postgresql (a version-specific
+      # subdirectory beneath it), not /var/lib/postgresql/data — mounting at
+      # the old path makes the entrypoint refuse to start.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # A normal, Compose-managed service — not something the backend creates or
+  # execs into itself. The backend only ever makes HTTP requests to it (see
+  # app/services/latex/compiler.py and latex-worker/server.py), so unlike an
+  # earlier version of this file, the backend needs no access to the Docker
+  # socket at all to get a PDF out of this.
+  latex-worker:
+    build: ./latex-worker
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  backend:
+    build: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override whatever backend/.env says, since inside this network the
+      # database and the LaTeX worker are reachable by service name, not
+      # `localhost`.
+      DATABASE_URL: postgresql+asyncpg://jarvis:jarvis_dev_password@postgres:5432/jarvis
+      LATEX_WORKER_URL: http://latex-worker:8100
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      latex-worker:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:4200"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

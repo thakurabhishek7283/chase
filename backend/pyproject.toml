@@ -9,8 +9,12 @@ dependencies = [
     "asyncpg>=0.31.0",
     "email-validator>=2.3.0",
     "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "pgvector>=0.5.0",
-    "pydantic-ai-slim[anthropic,google]>=2.21.0",
+    # `openai` is the client for NVIDIA NIM as well as OpenAI — NIM serves the
+    # OpenAI wire protocol, so the vendor difference is a base URL (see
+    # app/ai/provider.py). Add `google` back to re-enable the parked Gemini path.
+    "pydantic-ai-slim[anthropic,openai]>=2.21.0",
     "pydantic-settings>=2.14.2",
     "pyjwt>=2.10.1",
     "python-multipart>=0.0.32",
@@ -27,7 +31,6 @@ local-embeddings = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
 ]

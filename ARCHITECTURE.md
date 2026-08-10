@@ -64,8 +64,8 @@ extension can't destabilize the core schema.
 │      │                                                                │
 │      ├──► services/matching     (pgvector cosine search)              │
 │      ├──► embeddings/           (local | Voyage | OpenAI | Gemini)    │
-│      ├──► services/latex/       (.tex span map → splice → Tectonic)   │
-│      ├──► ai/provider.py        (Claude | Gemini selection)           │
+│      ├──► services/latex/       (.tex span map → splice → HTTP call)  │
+│      ├──► ai/provider.py        (Claude | Gemini selection)        │
 │      ├──► ai/intake, review     (Pydantic AI → the chosen LLM)        │
 │      ├──► ai/score.py           (score only — no patches, faster)     │
 │      ├──► services/review.py    (propose → resolve → splice)         │
@@ -75,15 +75,15 @@ extension can't destabilize the core schema.
               ┌─────────────────┼──────────────────┐
               ▼                 ▼                  ▼
      ┌────────────────┐  ┌──────────────┐  ┌───────────────┐
-     │  PostgreSQL    │  │  Claude API  │  │  Embedding    │
+     │  PostgreSQL    │  │  Gemini API  │  │  Embedding    │
      │  + pgvector    │  │      or      │  │  provider     │
-     │  (Docker)      │  │  Gemini API  │  │               │
+     │  (Docker)      │  │  Claude API  │  │               │
      └────────────────┘  └──────────────┘  └───────────────┘
 ```
 
 PDF compilation is a fourth external dependency, not shown above: a long-lived
-Docker worker container that every engine (Tectonic, pdflatex, xelatex,
-lualatex, latexmk) runs inside (§6.5).
+LaTeX worker service that every engine (pdflatex, xelatex, lualatex, latexmk)
+runs inside (§6.5).
 
 ### Why this stack
 
@@ -116,21 +116,22 @@ Jarvis/
 │   │   │   ├── review.py           propose → resolve → splice
 │   │   │   ├── scoring.py          cache a verdict; never refresh on read
 │   │   │   └── latex/              span-map parser, splice renderer, safety
-│   │   │                           allowlist, engine detection, Tectonic driver
+│   │   │                           allowlist, engine detection, worker HTTP client
 │   │   ├── embeddings/             provider abstraction (local | Voyage | OpenAI | Gemini)
 │   │   └── ai/                     intake / review / score / patch-revision agents,
 │   │                               provider resolution, 429 retry handling
 │   ├── alembic/versions/           migrations
-│   ├── docker/latex/               the LaTeX engine image (Dockerfile)
 │   └── tests/
-└── frontend/
-    └── src/app/
-        ├── core/                   models, typed HTTP services, auth interceptor + guard
-        ├── auth/ profile/ admin/   sign-in, self-service account, moderation queue
-        ├── layout/                 dashboard shell
-        ├── companies/ jobs/        moderated shared data
-        ├── resumes/                detail screen, score panel, review panel, patch cards
-        └── matches/                "Companies to Chase"
+├── frontend/
+│   └── src/app/
+│       ├── core/                   models, typed HTTP services, auth interceptor + guard
+│       ├── auth/ profile/ admin/   sign-in, self-service account, moderation queue
+│       ├── layout/                 dashboard shell
+│       ├── companies/ jobs/        moderated shared data
+│       ├── resumes/                detail screen, score panel, review panel, patch cards
+│       └── matches/                "Companies to Chase"
+└── latex-worker/                   the LaTeX engine image + its HTTP server (§6.5) —
+                                     a peer service, not a backend subcomponent
 ```
 
 **Layering rule:** `router → crud/services → models → database`. Routers
@@ -341,15 +342,35 @@ at upload — e.g. `\directlua` forces LuaLaTeX, `fontspec` forces a Unicode
 engine — and only ever upgraded, never silently downgraded). Tailored children
 inherit their master's engine, since they compile from the same template.
 
-Every engine (Tectonic, pdflatex, xelatex, lualatex, latexmk) runs inside one
-curated Docker image (`backend/docker/latex/Dockerfile`) — a `scheme-basic` TeX
-Live install plus just the collections resume templates actually need, not
-`scheme-full`'s ~4-5GB. Nothing is installed on the host. Compiles execute
-against one long-lived worker container rather than one spun up per request
-(`docker run` startup overhead is real for something invoked per upload); the
-app checks the worker's health before every compile and transparently rebuilds
-it on any mismatch, so a wedged or removed worker self-heals. `GET
-/resumes/engine-status` reports what's actually available.
+Every engine (pdflatex, xelatex, lualatex, latexmk) runs inside one curated
+Docker image (`latex-worker/`) — a `scheme-basic` TeX Live install plus just
+the collections resume templates actually need, not `scheme-full`'s ~4-5GB.
+Nothing is installed on the host. Every invocation runs `-no-shell-escape`:
+the document is untrusted (uploaded, then rewritten by an LLM), and LaTeX's
+shell-escape feature is exactly the kind of thing that turns "compile a
+resume" into command execution — the container boundary around the whole
+service is belt-and-suspenders on top of this, not a substitute for it.
+
+**The image runs as its own long-lived HTTP service, not something the backend
+creates or execs into.** A small stdlib-only server (`latex-worker/server.py`)
+wraps the engines behind three routes — `GET /health`, `GET /engines`,
+`POST /compile` — and `services/latex/compiler.py` is nothing more than an
+HTTP client for it, configured with `LATEX_WORKER_URL`. `docker-compose.yml`
+runs it as the `latex-worker` service; for native development, start the image
+once as a standalone container publishing port 8100 and the default URL finds
+it unchanged.
+
+This replaced an earlier design where the backend managed the worker
+container's entire lifecycle itself — `docker run` to create it, `docker exec`
+into it per compile, health-probing and recreating it on drift — which meant
+the backend needed the same control over Docker an operator's own user account
+has (a shared Docker socket, once the backend itself ran in a container).
+Compiling untrusted `.tex` still happens in its own disposable process, exactly
+as before; the backend just no longer needs the power to *create* containers
+to make that happen, which is a much smaller thing to trust it with, and it
+means one fewer host dependency (no `docker` CLI inside the backend image).
+`GET /resumes/engine-status` reports what the worker says is actually
+available.
 
 ---
 
@@ -518,7 +539,7 @@ maintenance cost — see §15 for the generated-client alternative.
 
 ## 11. Testing strategy
 
-Backend tests hit real PostgreSQL and, where relevant, a real Tectonic
+Backend tests hit real PostgreSQL and, where relevant, a real LaTeX
 compile — mocks are reserved for the paid/keyed boundary (the LLM), where
 Pydantic AI's `FunctionModel` drives scripted responses through the *real*
 validation, prompt construction, and splice logic. `test_no_op_render_is_byte_
@@ -549,8 +570,8 @@ Full annotated list in `backend/.env.example`; the essentials:
 | `LLM_PROVIDER` / `ATS_MODEL` | `anthropic` / `claude-opus-5` | Changed together — see §8 |
 | `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` | – | Whichever matches `LLM_PROVIDER` |
 | `EMBEDDING_PROVIDER` / `EMBEDDING_DIM` | `local` / `384` | Dimension is baked into the pgvector column — changing it needs a migration + full re-index |
-| `LATEX_DEFAULT_ENGINE` | `tectonic` | Server default; per-resume overrides live in `resumes.latex_engine` |
-| `LATEX_DOCKER_IMAGE` | `jarvis-latex:latest` | Built with `docker build -t jarvis-latex:latest backend/docker/latex` |
+| `LATEX_DEFAULT_ENGINE` | `pdflatex` | Server default; per-resume overrides live in `resumes.latex_engine` |
+| `LATEX_WORKER_URL` | `http://localhost:8100` | Where the LaTeX worker service listens — `docker-compose.yml` points this at the `latex-worker` service; the default is correct for a standalone worker container in native development. See §6.5 |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCKOUT_SECONDS` | `10` / `900` | Credential-stuffing throttle, keyed per IP *and* per email |
 | `JARVIS_TEST_DATABASE_URL` | – | Test-suite only |
 

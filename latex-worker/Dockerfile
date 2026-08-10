@@ -1,8 +1,6 @@
-# All five allowlisted LaTeX engines (services/latex/engines.py::ENGINE_NAMES)
-# in one image, so the host needs nothing but Docker itself:
-#
-#   - pdflatex, xelatex, lualatex, latexmk  come from a curated TeX Live install
-#   - tectonic                              is not part of TeX Live; installed below
+# All four allowlisted LaTeX engines (services/latex/engines.py::ENGINE_NAMES)
+# come from one curated TeX Live install, so the host needs nothing but Docker
+# itself: pdflatex, xelatex, lualatex, latexmk.
 #
 # TeX Live's scheme-full is ~4-5GB and installs entire subject areas (music
 # notation, chemistry, CJK typesetting) no resume template touches. This
@@ -13,17 +11,18 @@
 # (or its collection) to the `tlmgr install` line below rather than widening
 # the scheme — see ARCHITECTURE.md §7.6.
 #
-# compiler.py runs this image once per compile (`docker run --rm ...`),
-# bind-mounting a scratch temp dir at /work. It is never `docker compose up`'d
-# as a long-running service.
+# This image runs as a long-lived service, not a one-shot `docker run --rm`:
+# server.py (stdlib-only, no extra dependency worth a layer here) wraps the
+# engines in a tiny HTTP API on :8100, so the backend never needs to create,
+# exec into, or otherwise manage this container itself — it just makes HTTP
+# requests. See app/services/latex/compiler.py for why that split matters.
 FROM debian:bookworm-slim
 
-ARG TECTONIC_VERSION=0.17.0
 ARG CTAN_MIRROR=https://mirror.ctan.org/systems/texlive/tlnet
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        ca-certificates curl perl xz-utils fontconfig \
+        ca-certificates curl perl xz-utils fontconfig python3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/texlive-install
@@ -38,11 +37,7 @@ RUN curl -fsSL "${CTAN_MIRROR}/install-tl-unx.tar.gz" | tar -xz --strip-componen
     && ln -sf /usr/local/texlive/*/bin/x86_64-linux/* /usr/local/bin/ \
     && cd / && rm -rf /tmp/texlive-install
 
-# musl over gnu: a static binary with no glibc-version coupling to whatever
-# base image this Dockerfile happens to build FROM.
-RUN curl -fsSL \
-        "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/tectonic-${TECTONIC_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
-        | tar -xz -C /usr/local/bin \
-    && chmod +x /usr/local/bin/tectonic
+COPY server.py /usr/local/bin/server.py
 
-WORKDIR /work
+EXPOSE 8100
+CMD ["python3", "/usr/local/bin/server.py"]

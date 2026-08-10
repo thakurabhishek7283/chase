@@ -28,7 +28,7 @@ class Resume(SQLModel, table=True):
         # if a caller finds a way past the schema layer.
         CheckConstraint(
             "latex_engine IS NULL OR latex_engine IN "
-            "('tectonic', 'latexmk', 'pdflatex', 'xelatex', 'lualatex')",
+            "('latexmk', 'pdflatex', 'xelatex', 'lualatex')",
             name="ck_resumes_latex_engine",
         ),
     )

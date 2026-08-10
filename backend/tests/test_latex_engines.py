@@ -61,7 +61,7 @@ def test_required_packages_ignores_commented_lines() -> None:
 
 def test_detection_leaves_an_ordinary_document_on_the_default() -> None:
     assert detect_engine(PLAIN, "pdflatex") == "pdflatex"
-    assert detect_engine(PLAIN, "tectonic") == "tectonic"
+    assert detect_engine(PLAIN, "xelatex") == "xelatex"
 
 
 def test_detection_upgrades_pdflatex_for_fontspec() -> None:
@@ -69,13 +69,13 @@ def test_detection_upgrades_pdflatex_for_fontspec() -> None:
 
 
 def test_detection_leaves_a_unicode_default_alone() -> None:
-    # Tectonic is XeTeX-based and handles fontspec natively — no need to switch.
-    assert detect_engine(FONTSPEC, "tectonic") == "tectonic"
+    # xelatex already handles fontspec natively — no need to switch.
+    assert detect_engine(FONTSPEC, "xelatex") == "xelatex"
 
 
 @pytest.mark.parametrize("source", [LUA, DIRECTLUA])
 def test_detection_pins_lua_documents_to_lualatex(source: str) -> None:
-    assert detect_engine(source, "tectonic") == "lualatex"
+    assert detect_engine(source, "xelatex") == "lualatex"
     assert detect_engine(source, "pdflatex") == "lualatex"
 
 
@@ -85,8 +85,8 @@ def test_incompatibility_flags_fontspec_under_pdflatex() -> None:
     assert "fontspec" in reason
 
 
-def test_incompatibility_flags_lua_under_tectonic() -> None:
-    reason = incompatibility(LUA, "tectonic")
+def test_incompatibility_flags_lua_under_xelatex() -> None:
+    reason = incompatibility(LUA, "xelatex")
     assert reason is not None
     assert "LuaLaTeX" in reason
 
@@ -107,15 +107,15 @@ def test_a_guarded_primitive_is_not_a_requirement() -> None:
     # `\ifdefined` is the fix the error message recommends; flagging the fixed
     # document would make the advice impossible to follow.
     assert pdftex_only_markers(GUARDED) == set()
-    assert incompatibility(GUARDED, "tectonic") is None
-    assert detect_engine(GUARDED, "tectonic") == "tectonic"
+    assert incompatibility(GUARDED, "xelatex") is None
+    assert detect_engine(GUARDED, "xelatex") == "xelatex"
 
 
 def test_a_commented_out_primitive_does_not_count() -> None:
     assert pdftex_only_markers("% \\pdfgentounicode=1\n\\documentclass{article}") == set()
 
 
-@pytest.mark.parametrize("engine", ["tectonic", "xelatex"])
+@pytest.mark.parametrize("engine", ["xelatex"])
 def test_incompatibility_flags_pdftex_primitives_under_xetex(engine: str) -> None:
     reason = incompatibility(GLYPHTOUNICODE, engine)
     assert reason is not None
@@ -130,8 +130,8 @@ def test_pdftex_primitives_are_fine_off_xetex(engine: str) -> None:
     assert incompatibility(GLYPHTOUNICODE, engine) is None
 
 
-def test_detection_moves_a_pdftex_document_off_tectonic() -> None:
-    assert detect_engine(GLYPHTOUNICODE, "tectonic") == "pdflatex"
+def test_detection_moves_a_pdftex_document_off_xelatex() -> None:
+    assert detect_engine(GLYPHTOUNICODE, "xelatex") == "pdflatex"
     assert detect_engine(GLYPHTOUNICODE, "pdflatex") == "pdflatex"
 
 
@@ -154,8 +154,8 @@ def test_validate_accepts_every_allowlisted_name() -> None:
     [
         "rm -rf /",
         "/usr/bin/evil",
-        "tectonic; whoami",
-        "TECTONIC",
+        "pdflatex; whoami",
+        "PDFLATEX",
         "pdftex",
         "",
     ],

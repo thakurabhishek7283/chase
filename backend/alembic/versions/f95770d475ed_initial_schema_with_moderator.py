@@ -97,7 +97,7 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.CheckConstraint("content_format IN ('markdown', 'json', 'latex')", name='ck_resumes_content_format'),
-    sa.CheckConstraint("latex_engine IS NULL OR latex_engine IN ('tectonic', 'latexmk', 'pdflatex', 'xelatex', 'lualatex')", name='ck_resumes_latex_engine'),
+    sa.CheckConstraint("latex_engine IS NULL OR latex_engine IN ('latexmk', 'pdflatex', 'xelatex', 'lualatex')", name='ck_resumes_latex_engine'),
     sa.ForeignKeyConstraint(['master_resume_id'], ['resumes.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')

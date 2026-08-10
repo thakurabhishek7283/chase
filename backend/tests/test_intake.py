@@ -140,7 +140,7 @@ def test_an_empty_find_matches_nothing_and_is_refused() -> None:
 
 
 async def test_ingest_reads_a_template_the_builtin_shapes_cannot() -> None:
-    result = await ingest(CUSTOM, "tectonic", agent=_agent())
+    result = await ingest(CUSTOM, "xelatex", agent=_agent())
 
     assert result.resume.bullet_count == 2
     assert [r.latex for r in result.resume.regions] == ["Led the platform team."]
@@ -166,7 +166,7 @@ async def test_ingest_applies_the_corrections_it_was_given() -> None:
         ]
     )
 
-    result = await ingest(broken, "tectonic", agent=agent)
+    result = await ingest(broken, "xelatex", agent=agent)
 
     assert r"\ifdefined\pdfglyphtounicode" in result.source
     assert len(result.corrections) == 1
@@ -193,7 +193,7 @@ async def test_a_bullet_dense_resume_is_not_mistaken_for_a_lost_boundary() -> No
         f"\\begin{{itemize}}\n{bullets}\n\\end{{itemize}}\n\\end{{document}}\n"
     )
 
-    result = await ingest(dense, "tectonic", agent=_agent(schema={}))
+    result = await ingest(dense, "xelatex", agent=_agent(schema={}))
 
     assert result.resume.bullet_count == 14
 
@@ -204,7 +204,7 @@ async def test_ingest_refuses_a_vocabulary_that_resolves_to_nothing() -> None:
     # Valid LaTeX; the proposed macro just isn't in it — exactly the
     # "parser doesn't understand this document" case, not a compile failure.
     with pytest.raises(IntakeError, match="do not resolve") as excinfo:
-        await ingest(CUSTOM, "tectonic", agent=_agent(schema=schema))
+        await ingest(CUSTOM, "xelatex", agent=_agent(schema=schema))
     assert excinfo.value.code == LatexErrorCode.UNSUPPORTED_LATEX
 
 
@@ -213,7 +213,7 @@ async def test_ingest_refuses_a_vocabulary_naming_a_formatting_macro() -> None:
     schema = {**_SCHEMA, "bullet_macros": [{"name": "textbf"}]}
 
     with pytest.raises(IntakeError, match="rejected") as excinfo:
-        await ingest(CUSTOM, "tectonic", agent=_agent(schema=schema))
+        await ingest(CUSTOM, "xelatex", agent=_agent(schema=schema))
     assert excinfo.value.code == LatexErrorCode.UNSUPPORTED_LATEX
 
 
@@ -223,14 +223,15 @@ async def test_ingest_refuses_a_correction_that_does_not_apply() -> None:
     )
 
     with pytest.raises(IntakeError, match="not in the document") as excinfo:
-        await ingest(CUSTOM, "tectonic", agent=agent)
+        await ingest(CUSTOM, "xelatex", agent=agent)
     assert excinfo.value.code == LatexErrorCode.UNSUPPORTED_LATEX
 
 
 async def test_ingest_refuses_a_document_that_still_will_not_compile() -> None:
     # The engine has the last word. This one is caught before the engine even
     # runs, by the incompatibility pre-flight — a pdfTeX primitive left
-    # unguarded under Tectonic is a sentence, not a hundred lines of log.
+    # unguarded under a XeTeX-family engine is a sentence, not a hundred lines
+    # of log.
     broken = CUSTOM.replace(
         r"\documentclass{article}", "\\documentclass{article}\n\\pdfgentounicode=1"
     )
@@ -238,5 +239,5 @@ async def test_ingest_refuses_a_document_that_still_will_not_compile() -> None:
     # This is the other category: the document itself cannot compile, whatever
     # the vocabulary says about it.
     with pytest.raises(IntakeError, match="pdfgentounicode") as excinfo:
-        await ingest(broken, "tectonic", agent=_agent())
+        await ingest(broken, "xelatex", agent=_agent())
     assert excinfo.value.code == LatexErrorCode.INVALID_LATEX

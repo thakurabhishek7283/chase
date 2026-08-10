@@ -14,7 +14,7 @@
  * There is no `ResumeCreate`. Content enters through the upload endpoint only.
  */
 
-export type LatexEngine = 'tectonic' | 'latexmk' | 'pdflatex' | 'xelatex' | 'lualatex';
+export type LatexEngine = 'latexmk' | 'pdflatex' | 'xelatex' | 'lualatex';
 
 export interface Resume {
   id: string;
