@@ -2,14 +2,10 @@ import logging
 import os
 import secrets
 from functools import lru_cache
-from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
-
-EmbeddingProviderName = Literal["local", "voyage", "openai", "gemini"]
-LLMProviderName = Literal["anthropic", "google"]
 
 #: Fallback JWT signing key, regenerated on every process start.
 #:
@@ -20,24 +16,19 @@ LLMProviderName = Literal["anthropic", "google"]
 #: other's tokens) rather than silently insecure.
 _EPHEMERAL_JWT_SECRET = secrets.token_urlsafe(64)
 
-#: Pydantic AI model-identifier prefix per provider. Keeping this a mapping
-#: rather than an if/else means adding a provider is a data change.
-LLM_PROVIDER_PREFIX: dict[str, str] = {
-    "anthropic": "anthropic",
-    "google": "google-gla",
-}
-#: The environment variable each provider's SDK reads its credential from.
-LLM_PROVIDER_ENV_VAR: dict[str, str] = {
-    "anthropic": "ANTHROPIC_API_KEY",
-    "google": "GOOGLE_API_KEY",
-}
+#: Pydantic AI addresses the Gemini API as `google-gla` (Generative Language
+#: API), distinguishing it from `google-vertex`.
+LLM_PROVIDER_PREFIX = "google-gla"
+#: The variable the Google SDK reads its credential from, named in the 503 the
+#: LLM-backed routes return when nothing is configured.
+LLM_API_KEY_ENV_VAR = "GOOGLE_API_KEY"
 
 
 class Settings(BaseSettings):
     # The env file is overridable so the test suite can point at nothing and
     # stay hermetic. Without this, whatever a developer happens to have in
-    # backend/.env — a real provider key, a different LLM_PROVIDER — silently
-    # changes what the tests assert.
+    # backend/.env — a real API key, a different ATS_MODEL — silently changes
+    # what the tests assert.
     model_config = SettingsConfigDict(
         env_file=os.environ.get("JARVIS_ENV_FILE", ".env"), extra="ignore"
     )
@@ -119,26 +110,19 @@ class Settings(BaseSettings):
         return _EPHEMERAL_JWT_SECRET
 
     # --- Phase 2: embeddings -------------------------------------------------
-    # The vector column dimension is baked into the pgvector migration, so
-    # switching providers to one with a different dimension requires a new
-    # migration. Keep embedding_dim in sync with the active provider's model.
-    embedding_provider: EmbeddingProviderName = "local"
+    # Embeddings run locally (fastembed/ONNX): no key, no per-call cost, and
+    # nothing leaves the machine. `embedding_dim` must match both the model
+    # below and the pgvector column, whose width is baked into the migration —
+    # changing the model to one of a different width needs a new migration and
+    # a full re-index.
     embedding_dim: int = 384
     local_embedding_model: str = "BAAI/bge-small-en-v1.5"
-    voyage_api_key: str | None = None
-    voyage_model: str = "voyage-3"
-    openai_api_key: str | None = None
-    openai_embedding_model: str = "text-embedding-3-small"
-    gemini_embedding_model: str = "gemini-embedding-2"
 
     # --- The reasoning LLM ---------------------------------------------------
-    # `llm_provider` selects which vendor the intake, review and revision agents
-    # talk to. `ats_model` is the model id *within* that provider, so the two
-    # must be changed together — a Claude id under `google` will not resolve.
-    llm_provider: LLMProviderName = "anthropic"
-    anthropic_api_key: str | None = None
+    # The intake, review and revision agents all talk to Gemini. `ats_model` is
+    # a model id within that API, so only Gemini ids resolve here.
     google_api_key: str | None = None
-    ats_model: str = "claude-opus-5"
+    ats_model: str = "gemini-3.5-flash"
     #: Rate-limit (429) retries. Gemini's free tier allows 5 requests/minute,
     #: which a review of a long resume can exhaust — see `ai/limits.py`.
     llm_max_retries: int = 3
@@ -147,19 +131,7 @@ class Settings(BaseSettings):
     @property
     def llm_model_identifier(self) -> str:
         """The Pydantic AI model identifier, e.g. `google-gla:gemini-3.5-flash`."""
-        return f"{LLM_PROVIDER_PREFIX[self.llm_provider]}:{self.ats_model}"
-
-    @property
-    def llm_api_key(self) -> str | None:
-        """The configured credential for the active provider."""
-        return {
-            "anthropic": self.anthropic_api_key,
-            "google": self.google_api_key,
-        }[self.llm_provider]
-
-    @property
-    def llm_env_var(self) -> str:
-        return LLM_PROVIDER_ENV_VAR[self.llm_provider]
+        return f"{LLM_PROVIDER_PREFIX}:{self.ats_model}"
 
     # --- LaTeX ---------------------------------------------------------------
     # Every engine runs inside a separate worker service rather than being

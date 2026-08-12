@@ -23,12 +23,11 @@ os.environ.setdefault(
     or "postgresql+asyncpg://jarvis:jarvis_dev_password@localhost:5432/jarvis_test",
 )
 
-#: Ignore backend/.env entirely. A developer's real provider key or a different
-#: LLM_PROVIDER must not change what the suite asserts — tests that care about
-#: provider configuration set it explicitly.
+#: Ignore backend/.env entirely. A developer's real API key or a different
+#: ATS_MODEL must not change what the suite asserts — tests that care about
+#: model configuration set it explicitly.
 os.environ["JARVIS_ENV_FILE"] = "tests/.nonexistent.env"
-for _leaked_key in ("ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "NVIDIA_API_KEY"):
-    os.environ.pop(_leaked_key, None)
+os.environ.pop("GOOGLE_API_KEY", None)
 
 #: Pinned so token signing is deterministic within a run and the "no secret
 #: configured" warning stays out of the test output.

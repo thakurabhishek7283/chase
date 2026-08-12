@@ -1,7 +1,5 @@
-import pytest
-
 from app.core.config import Settings
-from app.embeddings import EmbeddingError, build_provider
+from app.embeddings import LocalEmbeddingProvider, build_provider
 from app.embeddings.base import EmbeddingProvider
 
 
@@ -31,23 +29,13 @@ async def test_embed_handles_empty_batch() -> None:
     assert await StubProvider().embed([]) == []
 
 
-def test_build_provider_selects_local_by_default() -> None:
-    provider = build_provider(Settings(embedding_provider="local", embedding_dim=384))
+def test_build_provider_returns_the_local_provider() -> None:
+    provider = build_provider(Settings(embedding_dim=384))
+    assert isinstance(provider, LocalEmbeddingProvider)
     assert provider.dimension == 384
 
 
-def test_build_provider_requires_voyage_key() -> None:
-    with pytest.raises(EmbeddingError, match="VOYAGE_API_KEY"):
-        build_provider(Settings(embedding_provider="voyage", voyage_api_key=None))
-
-
-def test_build_provider_requires_openai_key() -> None:
-    with pytest.raises(EmbeddingError, match="OPENAI_API_KEY"):
-        build_provider(Settings(embedding_provider="openai", openai_api_key=None))
-
-
 def test_build_provider_honours_configured_dimension() -> None:
-    provider = build_provider(
-        Settings(embedding_provider="voyage", voyage_api_key="k", embedding_dim=1024)
-    )
-    assert provider.dimension == 1024
+    # The declared dimension must follow the pgvector column, so it is read
+    # from settings rather than hard-coded to the default model's width.
+    assert build_provider(Settings(embedding_dim=1024)).dimension == 1024

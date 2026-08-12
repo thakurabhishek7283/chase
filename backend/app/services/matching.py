@@ -7,7 +7,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import Settings
-from app.embeddings import EmbeddingProvider
+from app.embeddings import PROVIDER_NAME, EmbeddingProvider
 from app.models.embedding import EntityEmbedding
 from app.models.job_profile import JobProfile
 
@@ -59,11 +59,11 @@ async def upsert_embedding(
         await session.rollback()
         raise VectorSearchUnavailableError(_MISSING_TABLE_MESSAGE) from exc
 
-    model_name = _model_name(settings)
+    model_name = settings.local_embedding_model
     if (
         existing is not None
         and existing.source_text == source_text
-        and existing.provider == settings.embedding_provider
+        and existing.provider == PROVIDER_NAME
         and existing.model == model_name
     ):
         return existing
@@ -76,13 +76,13 @@ async def upsert_embedding(
             entity_type=entity_type,
             entity_id=entity_id,
             source_text=source_text,
-            provider=settings.embedding_provider,
+            provider=PROVIDER_NAME,
             model=model_name,
             embedding=vector,
         )
     else:
         existing.source_text = source_text
-        existing.provider = settings.embedding_provider
+        existing.provider = PROVIDER_NAME
         existing.model = model_name
         existing.embedding = vector
         existing.updated_at = now
@@ -127,14 +127,6 @@ async def find_similar(
         await session.rollback()
         raise VectorSearchUnavailableError(_MISSING_TABLE_MESSAGE) from exc
     return [(row[0], float(row[1])) for row in result.all()]
-
-
-def _model_name(settings: Settings) -> str:
-    if settings.embedding_provider == "local":
-        return settings.local_embedding_model
-    if settings.embedding_provider == "voyage":
-        return settings.voyage_model
-    return settings.openai_embedding_model
 
 
 def _to_pgvector_literal(vector: list[float]) -> str:

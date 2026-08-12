@@ -3,9 +3,6 @@ from pydantic_ai.exceptions import ModelHTTPError
 
 from app.ai.limits import is_rate_limited, retry_after_seconds, run_agent
 from app.core.config import Settings
-from app.embeddings import build_provider
-from app.embeddings.base import EmbeddingError
-from app.embeddings.remote import GeminiEmbeddingProvider
 
 RATE_LIMIT_BODY = {
     "error": {
@@ -24,27 +21,13 @@ def _settings(**overrides) -> Settings:
     return Settings(_env_file=None, **overrides)
 
 
-# --- provider selection ------------------------------------------------------
+# --- model resolution ---------------------------------------------------------
 
 
-def test_default_provider_is_anthropic() -> None:
-    settings = _settings()
-    assert settings.llm_provider == "anthropic"
-    assert settings.llm_model_identifier == "anthropic:claude-opus-5"
-    assert settings.llm_env_var == "ANTHROPIC_API_KEY"
-
-
-def test_google_provider_uses_the_gla_prefix() -> None:
+def test_the_model_identifier_uses_the_gla_prefix() -> None:
     # Pydantic AI addresses the Gemini API as `google-gla`, not `google`.
-    settings = _settings(llm_provider="google", ats_model="gemini-3.5-flash")
-    assert settings.llm_model_identifier == "google-gla:gemini-3.5-flash"
-    assert settings.llm_env_var == "GOOGLE_API_KEY"
-
-
-def test_llm_api_key_follows_the_active_provider() -> None:
-    both = {"anthropic_api_key": "sk-ant", "google_api_key": "gk"}
-    assert _settings(llm_provider="anthropic", **both).llm_api_key == "sk-ant"
-    assert _settings(llm_provider="google", **both).llm_api_key == "gk"
+    assert _settings().llm_model_identifier == "google-gla:gemini-3.5-flash"
+    assert _settings(ats_model="gemini-2.5-pro").llm_model_identifier == "google-gla:gemini-2.5-pro"
 
 
 def test_resolve_model_falls_back_to_an_identifier_without_a_key(monkeypatch) -> None:
@@ -53,7 +36,7 @@ def test_resolve_model_falls_back_to_an_identifier_without_a_key(monkeypatch) ->
     from app.ai import provider as provider_module
 
     monkeypatch.setattr(provider_module, "get_settings", lambda: _settings())
-    assert provider_module.resolve_model() == "anthropic:claude-opus-5"
+    assert provider_module.resolve_model() == "google-gla:gemini-3.5-flash"
 
 
 def test_resolve_model_passes_the_key_to_the_provider(monkeypatch) -> None:
@@ -64,14 +47,23 @@ def test_resolve_model_passes_the_key_to_the_provider(monkeypatch) -> None:
     monkeypatch.setattr(
         provider_module,
         "get_settings",
-        lambda: _settings(
-            llm_provider="google", ats_model="gemini-3.5-flash", google_api_key="test-key"
-        ),
+        lambda: _settings(ats_model="gemini-3.5-flash", google_api_key="test-key"),
     )
     model = provider_module.resolve_model()
 
     assert not isinstance(model, str)
     assert model.model_name == "gemini-3.5-flash"
+
+
+def test_has_llm_credentials_reads_the_environment_too(monkeypatch) -> None:
+    from app.ai import provider as provider_module
+
+    monkeypatch.setattr(provider_module, "get_settings", lambda: _settings())
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    assert not provider_module.has_llm_credentials()
+
+    monkeypatch.setenv("GOOGLE_API_KEY", "from-the-environment")
+    assert provider_module.has_llm_credentials()
 
 
 # --- rate-limit handling -----------------------------------------------------
@@ -170,36 +162,3 @@ async def test_run_agent_does_not_retry_a_real_failure(no_sleep, monkeypatch) ->
         await run_agent(Unauthorized(), "prompt")
     assert Unauthorized.calls == 1
     assert no_sleep == []
-
-
-# --- Gemini embeddings -------------------------------------------------------
-
-
-def test_gemini_embedding_provider_is_wired_into_the_factory() -> None:
-    provider = build_provider(
-        _settings(embedding_provider="gemini", google_api_key="k", embedding_dim=768)
-    )
-    assert isinstance(provider, GeminiEmbeddingProvider)
-    assert provider.dimension == 768
-
-
-def test_gemini_embedding_provider_requires_a_key() -> None:
-    with pytest.raises(EmbeddingError, match="GOOGLE_API_KEY"):
-        build_provider(_settings(embedding_provider="gemini"))
-
-
-def test_truncated_gemini_vectors_are_renormalised() -> None:
-    # pgvector's cosine ops assume unit vectors; gemini-embedding-001 does not
-    # renormalise when truncated, so the provider must.
-    unit = GeminiEmbeddingProvider._unit([3.0, 4.0])
-    assert unit == pytest.approx([0.6, 0.8])
-    assert sum(v * v for v in unit) == pytest.approx(1.0)
-
-
-def test_normalising_a_zero_vector_does_not_divide_by_zero() -> None:
-    assert GeminiEmbeddingProvider._unit([0.0, 0.0]) == [0.0, 0.0]
-
-
-async def test_gemini_embedding_provider_returns_nothing_for_no_input() -> None:
-    provider = GeminiEmbeddingProvider("k", "gemini-embedding-2", 768)
-    assert await provider.embed([]) == []

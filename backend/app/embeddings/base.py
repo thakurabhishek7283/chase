@@ -8,8 +8,9 @@ class EmbeddingError(RuntimeError):
 class EmbeddingProvider(ABC):
     """Provider-agnostic embedding interface.
 
-    Anthropic does not offer an embeddings endpoint, so Phase 2 semantic
-    matching runs through one of several third-party or local providers.
+    Gemini is the reasoning model but not the embedding one: Phase 2 semantic
+    matching runs on-machine (see `local.py`). The interface stays abstract so
+    a hosted provider can be added without touching the matching service.
     Implementations must return unit-comparable float vectors of `dimension`
     length so pgvector's cosine distance operator behaves consistently.
     """

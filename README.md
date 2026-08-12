@@ -27,7 +27,7 @@ project optimizes resumes, not application tracking.
 - **Backend** — FastAPI + SQLModel + Alembic, managed with [uv](https://docs.astral.sh/uv/), `backend/`
 - **Database** — PostgreSQL + pgvector, run as a Docker container
 - **PDF output** — a curated TeX Live install (pdflatex, xelatex, lualatex, latexmk), bundled into one Docker image (`latex-worker/`) and run as its own HTTP service; nothing installed on the host
-- **LLM** — Llama 3.3 70B on NVIDIA NIM, or Claude, selected with `LLM_PROVIDER`
+- **LLM** — Google Gemini (`gemini-3.5-flash`), reached through Pydantic AI
 
 ## Prerequisites
 
@@ -43,8 +43,8 @@ Docker is installed on your machine.
 ```powershell
 # 1. Configure secrets — required even in Docker, since these aren't guessable
 copy backend\.env.example backend\.env
-# edit backend/.env: set JWT_SECRET_KEY and BOOTSTRAP_ADMIN_EMAIL, plus an LLM
-# key (NVIDIA_API_KEY or ANTHROPIC_API_KEY) — see "Choosing an LLM provider" below
+# edit backend/.env: set JWT_SECRET_KEY, BOOTSTRAP_ADMIN_EMAIL and
+# GOOGLE_API_KEY — see "The LLM key" below
 
 # 2. Everything, including the LaTeX engines
 docker compose up --build
@@ -81,7 +81,7 @@ docker run -d --name jarvis-latex-worker -p 8100:8100 --restart unless-stopped j
 cd backend
 uv sync
 copy .env.example .env
-# edit .env: set JWT_SECRET_KEY and BOOTSTRAP_ADMIN_EMAIL, plus an LLM key — see below
+# edit .env: set JWT_SECRET_KEY, BOOTSTRAP_ADMIN_EMAIL and GOOGLE_API_KEY — see below
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 
@@ -97,31 +97,28 @@ npm start
 Both containers started above just need to be running — restart them after a
 reboot with `docker start jarvis-postgres jarvis-latex-worker`.
 
-## Choosing an LLM provider
+## The LLM key
 
-Upload intake, resume review, and patch revision all run through one seam, so
-switching vendors is configuration, not code:
+Upload intake, resume review, and patch revision all run on Gemini. Get a key
+from [Google AI Studio](https://aistudio.google.com/apikey) and put it in
+`backend/.env`:
 
 ```ini
 # backend/.env
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-ATS_MODEL=claude-opus-5
-```
-
-```ini
-LLM_PROVIDER=google
 GOOGLE_API_KEY=...
-ATS_MODEL=gemini-3.5-flash
+ATS_MODEL=gemini-3.5-flash   # gemini-2.5-pro and gemini-3.1-pro-preview also work
 ```
 
-Only the active provider's key is required — a missing one produces a 503
-naming the variable to set. Note Gemini's free tier is 5 requests/minute; the
-app waits out the provider's own retry delay rather than failing.
+Without it the LLM-backed routes answer 503 naming the variable to set. Note
+the free tier is 5 requests/minute and 20/day; the app waits out the per-minute
+limit using the delay the API itself asks for, rather than failing.
 
 An upload is not stored until an LLM call *and* a real compile both succeed, so
-both an LLM key and a running LaTeX worker are required before you can use the
+both the key and a running LaTeX worker are required before you can use the
 app, not just before you can search or embed.
+
+Semantic matching does *not* use this key — embeddings run on your machine
+(fastembed/ONNX, 384-dim), so re-indexing costs nothing and sends nothing.
 
 ## Configuration
 
@@ -134,13 +131,13 @@ one is for. The ones you must set yourself before first run:
 |---|---|
 | `JWT_SECRET_KEY` | Unset ⇒ a random key per process — sessions die on every restart |
 | `BOOTSTRAP_ADMIN_EMAIL` | The address promoted to admin at registration |
-| `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY` | Matching whichever `LLM_PROVIDER` you chose |
+| `GOOGLE_API_KEY` | Gemini powers intake, review and tailoring — nothing works without it |
 
 ## Common issues
 
 | Symptom | Fix |
 |---|---|
-| `503 … needs an Anthropic API key` | Set the key matching your `LLM_PROVIDER` |
+| `503 … needs a Gemini API key` | Set `GOOGLE_API_KEY` in `backend/.env` and restart |
 | Every PDF compile fails / engine reports unavailable | Check the LaTeX worker is actually running (`docker ps`) and `LATEX_WORKER_URL` points at it — `docker logs jarvis-latex-worker` (native) or `docker compose logs latex-worker` (Compose) |
 | `401` on every request after a restart | `JWT_SECRET_KEY` was unset and got regenerated — set it in `backend/.env` |
 | No **Moderation** link in the sidebar | The signed-in account isn't an admin — register with `BOOTSTRAP_ADMIN_EMAIL` or `PATCH /users/{id}/role` |

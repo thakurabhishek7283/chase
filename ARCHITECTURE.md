@@ -16,7 +16,7 @@
 5. [The resume flow — upload, review, resolve, score](#5-the-resume-flow--upload-review-resolve-score)
 6. [Template-preserving LaTeX tailoring](#6-template-preserving-latex-tailoring)
 7. [Semantic matching](#7-semantic-matching)
-8. [The LLM provider seam](#8-the-llm-provider-seam)
+8. [The LLM seam](#8-the-llm-seam)
 9. [Authentication, scope & moderation](#9-authentication-scope--moderation)
 10. [Frontend design](#10-frontend-design)
 11. [Testing strategy](#11-testing-strategy)
@@ -63,10 +63,10 @@ extension can't destabilize the core schema.
 │  routers/ ──► crud/ ──► SQLModel ──► asyncpg ──► PostgreSQL           │
 │      │                                                                │
 │      ├──► services/matching     (pgvector cosine search)              │
-│      ├──► embeddings/           (local | Voyage | OpenAI | Gemini)    │
+│      ├──► embeddings/           (fastembed/ONNX, on this machine)     │
 │      ├──► services/latex/       (.tex span map → splice → HTTP call)  │
-│      ├──► ai/provider.py        (Claude | Gemini selection)        │
-│      ├──► ai/intake, review     (Pydantic AI → the chosen LLM)        │
+│      ├──► ai/provider.py        (Gemini model resolution)             │
+│      ├──► ai/intake, review     (Pydantic AI → Gemini)                │
 │      ├──► ai/score.py           (score only — no patches, faster)     │
 │      ├──► services/review.py    (propose → resolve → splice)         │
 │      └──► services/scoring.py   (cache the verdict; label it stale)   │
@@ -75,9 +75,9 @@ extension can't destabilize the core schema.
               ┌─────────────────┼──────────────────┐
               ▼                 ▼                  ▼
      ┌────────────────┐  ┌──────────────┐  ┌───────────────┐
-     │  PostgreSQL    │  │  Gemini API  │  │  Embedding    │
-     │  + pgvector    │  │      or      │  │  provider     │
-     │  (Docker)      │  │  Claude API  │  │               │
+     │  PostgreSQL    │  │  Gemini API  │  │  LaTeX worker │
+     │  + pgvector    │  │              │  │  (Docker)     │
+     │  (Docker)      │  │              │  │               │
      └────────────────┘  └──────────────┘  └───────────────┘
 ```
 
@@ -117,9 +117,9 @@ Jarvis/
 │   │   │   ├── scoring.py          cache a verdict; never refresh on read
 │   │   │   └── latex/              span-map parser, splice renderer, safety
 │   │   │                           allowlist, engine detection, worker HTTP client
-│   │   ├── embeddings/             provider abstraction (local | Voyage | OpenAI | Gemini)
+│   │   ├── embeddings/             on-machine embedding provider (fastembed)
 │   │   └── ai/                     intake / review / score / patch-revision agents,
-│   │                               provider resolution, 429 retry handling
+│   │                               model resolution, 429 retry handling
 │   ├── alembic/versions/           migrations
 │   └── tests/
 ├── frontend/
@@ -380,16 +380,15 @@ Deliberately independent of the resume flow: matching reads a user's career
 goals and ranks job profiles against them by cosine similarity over pgvector —
 it never touches a resume.
 
-Embeddings go through a small provider interface
-(`EmbeddingProvider.embed(texts) -> vectors`) rather than a hard-coded vendor,
-because Anthropic has no embeddings endpoint of its own:
+Embedding is the one AI step that does **not** leave the machine: it runs
+`BAAI/bge-small-en-v1.5` through fastembed (ONNX), 384 dimensions, no key and
+no per-call cost. Matching is a bulk operation — re-indexing every job profile
+is one model call per row — so a hosted embedding API would dominate the
+running cost of a feature a small local model handles well.
 
-| Provider | Model | Dim | Key |
-|---|---|---|---|
-| `local` *(default)* | `BAAI/bge-small-en-v1.5` via fastembed (ONNX) | 384 | none |
-| `voyage` | `voyage-3` | 1024 | `VOYAGE_API_KEY` |
-| `openai` | `text-embedding-3-small` | 1536 | `OPENAI_API_KEY` |
-| `gemini` | `gemini-embedding-2` | configurable | `GOOGLE_API_KEY` |
+It still sits behind a narrow interface (`EmbeddingProvider.embed(texts) ->
+vectors`), so the matching service never names a vendor and a hosted provider
+could be added without touching it (§15).
 
 Vectors live in their own polymorphic table (`entity_embeddings`), not a column
 on `users`/`job_profiles`, for four reasons: the optional pgvector extension
@@ -407,12 +406,12 @@ endpoint is unaffected, by design (§13).
 
 ---
 
-## 8. The LLM provider seam
+## 8. The LLM seam
 
-`ai/provider.py` is the single place that resolves `LLM_PROVIDER` + `ATS_MODEL`
-into a live Pydantic AI agent; the intake, review, and patch-revision agents
-never name a vendor. Supporting Gemini alongside Claude meant adding one module
-and two config mappings, not editing every agent.
+`ai/provider.py` is the single place that resolves `ATS_MODEL` into a live
+Pydantic AI model; the intake, review, and patch-revision agents take an
+injectable `Agent` and never name a vendor, so changing model — or adding a
+second one behind the same seam — is one module, not every agent.
 
 Two details worth knowing if you touch this code:
 
@@ -567,9 +566,9 @@ Full annotated list in `backend/.env.example`; the essentials:
 | `DATABASE_URL` | `postgresql+asyncpg://jarvis:…@localhost:5432/jarvis` | Must use the `asyncpg` driver |
 | `JWT_SECRET_KEY` | random per process | **Set this.** ≥32 bytes (RFC 7518 §3.2) or refused |
 | `BOOTSTRAP_ADMIN_EMAIL` | – | Promoted to admin at registration |
-| `LLM_PROVIDER` / `ATS_MODEL` | `anthropic` / `claude-opus-5` | Changed together — see §8 |
-| `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` | – | Whichever matches `LLM_PROVIDER` |
-| `EMBEDDING_PROVIDER` / `EMBEDDING_DIM` | `local` / `384` | Dimension is baked into the pgvector column — changing it needs a migration + full re-index |
+| `ATS_MODEL` | `gemini-3.5-flash` | The Gemini model the agents use — see §8 |
+| `GOOGLE_API_KEY` | – | **Set this.** Required before any upload or review works |
+| `EMBEDDING_DIM` / `LOCAL_EMBEDDING_MODEL` | `384` / `BAAI/bge-small-en-v1.5` | Dimension is baked into the pgvector column — changing it needs a migration + full re-index |
 | `LATEX_DEFAULT_ENGINE` | `pdflatex` | Server default; per-resume overrides live in `resumes.latex_engine` |
 | `LATEX_WORKER_URL` | `http://localhost:8100` | Where the LaTeX worker service listens — `docker-compose.yml` points this at the `latex-worker` service; the default is correct for a standalone worker container in native development. See §6.5 |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCKOUT_SECONDS` | `10` / `900` | Credential-stuffing throttle, keyed per IP *and* per email |
@@ -613,9 +612,10 @@ itself tested so a refactor can't quietly turn a 503 into a 500.
 
 ## 15. Extending the system
 
-**New embedding provider** — subclass `EmbeddingProvider`, register it in
+**Hosted embedding provider** — subclass `EmbeddingProvider`, return it from
 `build_provider()`, set `EMBEDDING_DIM` (write a migration if it differs from
-the current column).
+the current column) and give `PROVIDER_NAME` a per-provider value so stored
+vectors stay attributable.
 
 **New embeddable entity** — widen the `entity_type` CHECK constraint, write a
 `build_*_text()` function, extend `/matching/reindex`. No new table.
