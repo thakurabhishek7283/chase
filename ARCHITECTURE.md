@@ -1,4 +1,4 @@
-# AI-Centric Interview Tracker & Resume Optimizer — Architecture
+# Chase — Architecture
 
 > A working reference for how this system is built and why, at a level useful
 > for extending it. For step-by-step setup, see [README.md](README.md).

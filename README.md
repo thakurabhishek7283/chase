@@ -1,9 +1,14 @@
-# AI-Centric Interview Tracker & Resume Optimizer
+# Chase — AI resume tailoring & job matching
+
+[![CI](https://github.com/thakurabhishek7283/chase/actions/workflows/ci.yml/badge.svg)](https://github.com/thakurabhishek7283/chase/actions/workflows/ci.yml)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
 An Angular + FastAPI system that semantically matches job openings to your career
-goals, and uses Claude or Gemini to score your LaTeX resume against an ATS and
-tailor it — repeatedly, one reviewed change at a time, without the template ever
-moving.
+goals, and uses Gemini to score your LaTeX resume against an ATS and tailor it —
+repeatedly, one reviewed change at a time, without the template ever moving.
+
+> The services, database and containers still carry the project's earlier
+> codename, `jarvis` (for example `jarvis-postgres`, `JARVIS_TEST_DATABASE_URL`).
 
 > 📖 **[ARCHITECTURE.md](ARCHITECTURE.md)** — system design, data model, request
 > flows, and known gaps.
@@ -79,7 +84,7 @@ docker run -d --name jarvis-latex-worker -p 8100:8100 --restart unless-stopped j
 
 # 3. Backend
 cd backend
-uv sync
+uv sync --extra local-embeddings   # the extra is the local embedding model for matching
 copy .env.example .env
 # edit .env: set JWT_SECRET_KEY, BOOTSTRAP_ADMIN_EMAIL and GOOGLE_API_KEY — see below
 uv run alembic upgrade head
@@ -132,6 +137,22 @@ one is for. The ones you must set yourself before first run:
 | `JWT_SECRET_KEY` | Unset ⇒ a random key per process — sessions die on every restart |
 | `BOOTSTRAP_ADMIN_EMAIL` | The address promoted to admin at registration |
 | `GOOGLE_API_KEY` | Gemini powers intake, review and tailoring — nothing works without it |
+
+## Tests
+
+```bash
+# Backend: 270 tests against a real Postgres + pgvector (the jarvis_test
+# database from step 1) and the LaTeX worker on :8100
+cd backend
+uv run pytest
+
+# Frontend
+cd frontend
+npm test -- --watch=false
+```
+
+[CI](.github/workflows/ci.yml) runs both on every push, with Postgres as a
+service container and the LaTeX worker started from `latex-worker/server.py`.
 
 ## Common issues
 

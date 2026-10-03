@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: jarvis
+          POSTGRES_PASSWORD: jarvis_dev_password
+          POSTGRES_DB: jarvis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jarvis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # The LaTeX worker is a stdlib-only HTTP wrapper around the engines, so CI
+      # runs it directly on Debian's TeX Live instead of building the image.
+      - name: LaTeX engines
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+            texlive-xetex texlive-luatex latexmk
+      - name: Start the LaTeX worker
+        run: |
+          nohup python3 latex-worker/server.py > latex-worker.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8100/health && break; sleep 1; done
+
+      - uses: astral-sh/setup-uv@v6
+      - name: Install
+        working-directory: backend
+        run: uv sync --frozen
+      - name: Test
+        working-directory: backend
+        run: uv run pytest -q
+
+  frontend:
+    name: Frontend (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx ng build
+      - run: npx ng test --watch=false
