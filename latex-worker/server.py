@@ -11,7 +11,8 @@ Routes:
   GET  /engines  -> {name: {available, version}} for every allowlisted engine
   POST /compile?engine=<name>&timeout=<seconds>, body = raw .tex source
        -> 200 + PDF bytes on success
-       -> 400 unknown engine name, 503 engine not installed,
+       -> 400 unknown engine name or non-UTF-8 body, 413 empty/oversized body,
+          503 engine not installed,
           422 the engine ran but rejected the document (JSON {"detail": ...})
 """
 
@@ -26,6 +27,11 @@ from urllib.parse import parse_qs, urlparse
 
 ENGINE_NAMES = frozenset({"latexmk", "pdflatex", "xelatex", "lualatex"})
 DEFAULT_TIMEOUT_SECONDS = 120
+#: Bounds on what a caller may ask for. The backend is the only client, but a
+#: worker that holds an unbounded body in memory or runs an engine for an hour
+#: because a query string said so is one bug away from an outage.
+MAX_TIMEOUT_SECONDS = 600
+MAX_BODY_BYTES = 8 * 1024 * 1024
 PORT = 8100
 
 #: LaTeX reports real errors on lines starting with '!'. Everything else in a
@@ -149,9 +155,20 @@ class Handler(BaseHTTPRequestHandler):
             timeout_seconds = int((params.get("timeout") or [str(DEFAULT_TIMEOUT_SECONDS)])[0])
         except ValueError:
             timeout_seconds = DEFAULT_TIMEOUT_SECONDS
+        timeout_seconds = max(1, min(timeout_seconds, MAX_TIMEOUT_SECONDS))
 
-        length = int(self.headers.get("Content-Length", 0))
-        tex_source = self.rfile.read(length).decode("utf-8")
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            length = -1
+        if not 0 < length <= MAX_BODY_BYTES:
+            self._send(*_json(413, {"detail": f"Body must be 1..{MAX_BODY_BYTES} bytes."}))
+            return
+        try:
+            tex_source = self.rfile.read(length).decode("utf-8")
+        except UnicodeDecodeError:
+            self._send(*_json(400, {"detail": "The document is not valid UTF-8."}))
+            return
 
         self._send(*_compile(engine, tex_source, timeout_seconds))
 
