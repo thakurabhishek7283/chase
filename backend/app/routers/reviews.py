@@ -25,7 +25,7 @@ a grandchild.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlmodel import col, desc, select
@@ -47,7 +47,6 @@ from app.models.review import ResumePatch, ResumeReview
 from app.models.user import User
 from app.routers.resumes import (
     attachment,
-    build_outline,
     compile_or_error,
     latex_error_detail,
     root_resume_id,
@@ -69,9 +68,9 @@ from app.services.latex import (
     LatexRenderError,
     StaleEditError,
     TemplateDriftError,
+    parse,
 )
 from app.services.resume_text import readable_text, slot_config_for
-from app.services.latex import parse
 
 router = APIRouter(tags=["reviews"])
 
@@ -79,9 +78,7 @@ router = APIRouter(tags=["reviews"])
 # --- loading and shaping -----------------------------------------------------
 
 
-async def _load_review(
-    session: SessionDep, review_id: uuid.UUID, user: User
-) -> ResumeReview:
+async def _load_review(session: SessionDep, review_id: uuid.UUID, user: User) -> ResumeReview:
     """A review the caller owns. Non-owners get 404, never 403.
 
     Same rule as `require_owned_resume`, for the same reason: a review names a
@@ -187,7 +184,7 @@ async def create_review(
         parsed = parse(source.content, slot_config_for(source))
     except LatexParseError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=latex_error_detail(
                 LatexErrorCode.UNSUPPORTED_LATEX,
                 f"This resume can no longer be read with its stored slot config: {exc} "
@@ -195,9 +192,7 @@ async def create_review(
             ),
         ) from exc
 
-    result = await review_resume(
-        parsed, readable_text(source), job.description, job.position_title
-    )
+    result = await review_resume(parsed, readable_text(source), job.description, job.position_title)
     review = await review_service.create_review(
         session, source=source, parsed=parsed, job_profile_id=job.id, result=result
     )
@@ -243,9 +238,7 @@ async def list_reviews(
 
 
 @router.get("/reviews/{review_id}", response_model=ReviewRead, tags=["reviews"])
-async def get_review(
-    review_id: uuid.UUID, session: SessionDep, user: CurrentUser
-) -> ReviewRead:
+async def get_review(review_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> ReviewRead:
     review = await _load_review(session, review_id, user)
     patches = await review_service.patches_for(session, review.id)
     return _review_out(review, patches)
@@ -254,9 +247,7 @@ async def get_review(
 # --- resolving patches -------------------------------------------------------
 
 
-@router.patch(
-    "/reviews/{review_id}/patches/{patch_id}", response_model=PatchRead, tags=["reviews"]
-)
+@router.patch("/reviews/{review_id}/patches/{patch_id}", response_model=PatchRead, tags=["reviews"])
 async def decide_patch(
     review_id: uuid.UUID,
     patch_id: uuid.UUID,
@@ -275,7 +266,7 @@ async def decide_patch(
     patch = await _load_patch(session, review, patch_id)
 
     patch.status = "accepted" if data.action == "accept" else "rejected"
-    patch.updated_at = datetime.now(timezone.utc)
+    patch.updated_at = datetime.now(UTC)
     review_service.touch(review)
     session.add(patch)
     session.add(review)
@@ -338,7 +329,7 @@ async def send_patch_back(
         items = [strip_code_fence(item).strip() for item in revised.items if item.strip()]
         if not items:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     "The revision came back empty, which would delete this section's "
                     "bullets. Reject the patch instead, or rephrase the feedback."
@@ -349,7 +340,7 @@ async def send_patch_back(
         latex = strip_code_fence(revised.latex).strip()
         if not latex:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     "The revision came back empty, which would delete this region. "
                     "Reject the patch instead, or rephrase the feedback."
@@ -362,7 +353,7 @@ async def send_patch_back(
     patch.status = "pending"
     if revised.note:
         patch.reason = revised.note
-    patch.updated_at = datetime.now(timezone.utc)
+    patch.updated_at = datetime.now(UTC)
     review_service.touch(review)
     session.add(patch)
     session.add(review)
@@ -390,7 +381,7 @@ async def revert_patch(
     patch.proposed_latex = patch.initial_latex
     patch.feedback = None
     patch.status = "pending"
-    patch.updated_at = datetime.now(timezone.utc)
+    patch.updated_at = datetime.now(UTC)
     review_service.touch(review)
     session.add(patch)
     session.add(review)
@@ -424,7 +415,7 @@ async def _splice_or_error(
         ) from exc
     except (LatexParseError, LatexRenderError) as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=latex_error_detail(LatexErrorCode.UNSUPPORTED_LATEX, str(exc)),
         ) from exc
 
@@ -483,7 +474,7 @@ async def finalize_review(
     siblings = await crud.list_resume_versions(session, root_id, user_id=user.id)
     label = data.version_label or _next_label(job, siblings)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     child = Resume(
         user_id=source.user_id,
         master_resume_id=root_id,
@@ -517,12 +508,8 @@ async def finalize_review(
     )
 
 
-@router.delete(
-    "/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["reviews"]
-)
-async def delete_review(
-    review_id: uuid.UUID, session: SessionDep, user: CurrentUser
-) -> None:
+@router.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["reviews"])
+async def delete_review(review_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> None:
     """Discard a review. Its patches go with it; a finalized child does not."""
     review = await _load_review(session, review_id, user)
     await session.delete(review)

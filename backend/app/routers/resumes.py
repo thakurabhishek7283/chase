@@ -13,7 +13,7 @@ only reads.
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
 
@@ -100,9 +100,7 @@ def _config_in(data: SlotConfigOut) -> SlotConfig:
     """Build a config from a client payload, 422ing on anything unsafe."""
     try:
         return SlotConfig(
-            section_macros=tuple(
-                data.section_macros or get_settings().latex_section_macro_list
-            ),
+            section_macros=tuple(data.section_macros or get_settings().latex_section_macro_list),
             environments=tuple(data.environments),
             bullet_macros=tuple(BulletMacro(name=m.name) for m in data.bullet_macros),
             list_pairs=tuple(ListPair(start=p.start, end=p.end) for p in data.list_pairs),
@@ -115,7 +113,7 @@ def _config_in(data: SlotConfigOut) -> SlotConfig:
         ).validate()
     except SlotConfigError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=latex_error_detail(LatexErrorCode.UNSUPPORTED_LATEX, str(exc)),
         ) from exc
 
@@ -125,7 +123,7 @@ def _parse_or_422(source: str, config: SlotConfig) -> LatexResume:
         return parse(source, config)
     except LatexParseError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=latex_error_detail(LatexErrorCode.UNSUPPORTED_LATEX, str(exc)),
         ) from exc
 
@@ -195,7 +193,7 @@ async def compile_or_error(
     """
     if reason := incompatibility(source, effective_engine(engine)):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=latex_error_detail(LatexErrorCode.INVALID_LATEX, reason),
         )
     try:
@@ -207,8 +205,10 @@ async def compile_or_error(
     except LatexCompileError as exc:
         logger.error("[compile] resume=%s failed: %s", resume_id, exc)
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=latex_error_detail(LatexErrorCode.INVALID_LATEX, f"LaTeX compilation failed:\n{exc}"),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=latex_error_detail(
+                LatexErrorCode.INVALID_LATEX, f"LaTeX compilation failed:\n{exc}"
+            ),
         ) from exc
 
 
@@ -246,7 +246,7 @@ def _validated_engine(name: str | None) -> str | None:
         return validate_engine(name)
     except UnknownEngineError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
 
 
@@ -274,7 +274,7 @@ async def upload_master(
 
     if file.filename and not file.filename.lower().endswith(".tex"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Only .tex files are accepted. {file.filename!r} is not one.",
         )
 
@@ -288,7 +288,7 @@ async def upload_master(
         source = raw.decode("utf-8")
     except UnicodeDecodeError:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="The .tex file must be UTF-8 encoded.",
         ) from None
 
@@ -302,7 +302,7 @@ async def upload_master(
         ) from exc
     except IntakeError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=latex_error_detail(exc.code, str(exc)),
         ) from exc
 
@@ -386,7 +386,7 @@ async def set_slot_config(
     )
 
     resume.latex_slot_config = config.to_dict() if config else None
-    resume.updated_at = datetime.now(timezone.utc)
+    resume.updated_at = datetime.now(UTC)
     session.add(resume)
     await session.commit()
     await session.refresh(resume)
@@ -394,9 +394,7 @@ async def set_slot_config(
 
 
 @router.get("/{resume_id}/tex")
-async def download_tex(
-    resume_id: uuid.UUID, session: SessionDep, user: CurrentUser
-) -> Response:
+async def download_tex(resume_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Response:
     resume = await require_owned_resume(session, resume_id, user)
     return Response(
         content=resume.content,
