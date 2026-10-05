@@ -1,0 +1,33 @@
+# Development overlay: publishes the internal services on localhost so the
+# backend and frontend can run natively with reload-on-save.
+#
+#   # just the infrastructure, then `uv run uvicorn ...` / `npm start` natively
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres latex-worker
+#
+#   # or the backend in a container too, reloading on every save in backend/app
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Ports bind to 127.0.0.1 only: these are development conveniences, not
+# something to expose to the network you happen to be on.
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
+  latex-worker:
+    ports:
+      - "127.0.0.1:8100:8100"
+
+  backend:
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Reachable directly on :8000 now, so stop trusting X-Forwarded-For from
+      # arbitrary peers (uvicorn's default trusts only 127.0.0.1).
+      FORWARDED_ALLOW_IPS: "127.0.0.1"
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./backend/alembic:/app/alembic:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app"]
