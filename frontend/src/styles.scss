@@ -1,4 +1,49 @@
-/* You can add global styles to this file, and also import other style files */
+/**
+ * Base layer. Without it the app renders in the browser's default serif face
+ * inside an 8px white frame (the default body margin), and form controls use
+ * a different font from the text around them.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #111827;
+  background: #f3f4f6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+}
 
 /**
  * Moderation and role badges.

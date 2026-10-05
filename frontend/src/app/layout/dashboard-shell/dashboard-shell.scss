@@ -4,7 +4,8 @@
 }
 
 .sidenav {
-  width: 200px;
+  // 200px of content plus padding (the global reset makes this border-box).
+  width: 232px;
   flex-shrink: 0;
   background: #1f2937;
   color: #f9fafb;
