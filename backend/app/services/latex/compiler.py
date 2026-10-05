@@ -30,9 +30,9 @@ from app.core.config import get_settings
 from app.services.latex.engines import validate_engine
 
 INSTALL_HINT = (
-    "No LaTeX worker reachable. Start it once — "
-    "`docker run -d -p 8100:8100 --name jarvis-latex-worker jarvis-latex:latest` "
-    "for native development, or `docker compose up -d latex-worker` — and check "
+    "No LaTeX worker reachable. Start it — `make dev-infra` (or `docker compose "
+    "-f docker-compose.yml -f docker-compose.dev.yml up -d latex-worker`) for "
+    "native development, `docker compose up -d` for the full stack — and check "
     "LATEX_WORKER_URL points at it."
 )
 
