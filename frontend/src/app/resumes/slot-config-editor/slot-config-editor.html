@@ -15,9 +15,8 @@
     <div class="review">
       <p>
         <strong>This boundary was inferred, not agreed.</strong>
-        These macros decide what tailoring may rewrite. Check that nothing
-        holding an employer, a title, or a date is listed as content — then
-        confirm it.
+        These macros decide what tailoring may rewrite. Check that nothing holding an employer, a
+        title, or a date is listed as content — then confirm it.
       </p>
       <div class="review-actions">
         <button type="button" class="primary" (click)="confirmAsIs()" [disabled]="busy()">
@@ -37,7 +36,9 @@
       <div class="group">
         <h4>
           Bullet macros
-          <span class="hint">One argument, holding one bullet: <code>\achievement&#123;…&#125;</code></span>
+          <span class="hint"
+            >One argument, holding one bullet: <code>\achievement&#123;…&#125;</code></span
+          >
         </h4>
         @for (macro of config().bullet_macros; track $index) {
           <div class="row">
@@ -59,7 +60,9 @@
           Field macros
           <span class="hint">
             Several arguments, one of them prose:
-            <code>\cventry&#123;employer&#125;&#123;title&#125;&#123;dates&#125;&#123;prose&#125;</code>
+            <code
+              >\cventry&#123;employer&#125;&#123;title&#125;&#123;dates&#125;&#123;prose&#125;</code
+            >
             is arity 4, content argument 4. Every argument you do not name stays frozen.
           </span>
         </h4>

@@ -50,10 +50,9 @@ export class Profile implements OnInit {
     return typed.length > 0 && current !== undefined && typed !== current;
   });
 
-  private readonly emailValue = toSignal(
-    this.profileForm.controls.email.valueChanges,
-    { initialValue: this.profileForm.controls.email.value },
-  );
+  private readonly emailValue = toSignal(this.profileForm.controls.email.valueChanges, {
+    initialValue: this.profileForm.controls.email.value,
+  });
 
   readonly passwordForm = this.fb.nonNullable.group({
     current_password: ['', Validators.required],
@@ -99,7 +98,9 @@ export class Profile implements OnInit {
       .subscribe({
         next: () => {
           this.profileNotice.set(
-            movingEmail ? 'Profile saved. Sign in with your new email next time.' : 'Profile saved.',
+            movingEmail
+              ? 'Profile saved. Sign in with your new email next time.'
+              : 'Profile saved.',
           );
           this.profileForm.controls.current_password.setValue('');
           this.savingProfile.set(false);

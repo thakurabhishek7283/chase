@@ -5,13 +5,15 @@
 
 @if (resumeId()) {
   <section class="landed">
-    <h3>Stored, with {{ corrections().length }} correction{{ corrections().length === 1 ? '' : 's' }}</h3>
+    <h3>
+      Stored, with {{ corrections().length }} correction{{ corrections().length === 1 ? '' : 's' }}
+    </h3>
     @if (verdict()) {
       <p class="verdict">{{ verdict() }}</p>
     }
     <p class="hint">
-      Your file did not compile as submitted. These are the changes made to it — the
-      stored master is the corrected version.
+      Your file did not compile as submitted. These are the changes made to it — the stored master
+      is the corrected version.
     </p>
     <ul class="corrections">
       @for (correction of corrections(); track $index) {
@@ -42,8 +44,8 @@
       LaTeX file
       <input type="file" accept=".tex" (change)="onFileSelected($event)" name="file" />
       <span class="hint">
-        <code>.tex</code> only. It is read once, corrected if it will not build, and
-        compiled to prove it works before anything is stored.
+        <code>.tex</code> only. It is read once, corrected if it will not build, and compiled to
+        prove it works before anything is stored.
       </span>
     </label>
 

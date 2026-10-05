@@ -3,9 +3,8 @@
     <h2>{{ resume()?.title || 'Resume' }}</h2>
     @if (resume(); as r) {
       <p class="sub">
-        {{ r.version_label || 'Master' }} ·
-        {{ r.latex_engine || 'server default' }} ·
-        updated {{ r.updated_at | date: 'mediumDate' }}
+        {{ r.version_label || 'Master' }} · {{ r.latex_engine || 'server default' }} · updated
+        {{ r.updated_at | date: 'mediumDate' }}
         @if (r.master_resume_id; as masterId) {
           · <a [routerLink]="['/resumes', masterId]">back to the master</a>
         }
@@ -41,7 +40,9 @@
     </header>
     <p class="counts">
       {{ o.group_count }} bullet group{{ o.group_count === 1 ? '' : 's' }} ·
-      {{ o.bullet_count }} bullets · {{ o.region_count }} marked region{{ o.region_count === 1 ? '' : 's' }}
+      {{ o.bullet_count }} bullets · {{ o.region_count }} marked region{{
+        o.region_count === 1 ? '' : 's'
+      }}
     </p>
 
     <div class="sections">
@@ -105,12 +106,12 @@
   }
 
   <p class="hint">
-    Scoring only reports how this resume screens. <strong>Review and improve</strong> is the
-    one model call that also drafts every change worth making — you accept, reject or send
-    back each one, and nothing is written until they are all resolved.
+    Scoring only reports how this resume screens. <strong>Review and improve</strong> is the one
+    model call that also drafts every change worth making — you accept, reject or send back each
+    one, and nothing is written until they are all resolved.
     @if (isChild()) {
-      Reviewing this version again is how its score gets raised; the result is saved as
-      another version of the same master.
+      Reviewing this version again is how its score gets raised; the result is saved as another
+      version of the same master.
     }
   </p>
 </section>

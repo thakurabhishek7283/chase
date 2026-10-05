@@ -12,7 +12,9 @@
   <p>Loading…</p>
 } @else {
   <section>
-    <h3>Companies <span class="count">{{ companies().length }}</span></h3>
+    <h3>
+      Companies <span class="count">{{ companies().length }}</span>
+    </h3>
 
     @if (companies().length === 0) {
       <p class="empty">Nothing awaiting review.</p>
@@ -24,8 +26,15 @@
               <div class="title">{{ company.name }}</div>
               <div class="meta">
                 <code>{{ company.slug }}</code>
-                @if (company.industry) { · {{ company.industry }} }
-                @if (company.website) { · <a [href]="company.website" target="_blank" rel="noopener">{{ company.website }}</a> }
+                @if (company.industry) {
+                  · {{ company.industry }}
+                }
+                @if (company.website) {
+                  ·
+                  <a [href]="company.website" target="_blank" rel="noopener">{{
+                    company.website
+                  }}</a>
+                }
               </div>
             </div>
             <div class="review">
@@ -35,7 +44,12 @@
                 [ngModel]="reasonFor(company.id)"
                 (ngModelChange)="setReason(company.id, $event)"
               />
-              <button type="button" class="approve" (click)="approveCompany(company)" [disabled]="busy() === company.id">
+              <button
+                type="button"
+                class="approve"
+                (click)="approveCompany(company)"
+                [disabled]="busy() === company.id"
+              >
                 Approve
               </button>
               <button
@@ -54,7 +68,9 @@
   </section>
 
   <section>
-    <h3>Job postings <span class="count">{{ jobs().length }}</span></h3>
+    <h3>
+      Job postings <span class="count">{{ jobs().length }}</span>
+    </h3>
 
     @if (jobs().length === 0) {
       <p class="empty">Nothing awaiting review.</p>
@@ -65,9 +81,13 @@
             <div class="detail">
               <div class="title">{{ job.position_title }}</div>
               <div class="meta">
-                @if (job.external_job_id) { <code>{{ job.external_job_id }}</code> · }
+                @if (job.external_job_id) {
+                  <code>{{ job.external_job_id }}</code> ·
+                }
                 {{ job.location || 'Location not given' }}
-                @if (job.experience_tier) { · {{ job.experience_tier }} }
+                @if (job.experience_tier) {
+                  · {{ job.experience_tier }}
+                }
               </div>
             </div>
             <div class="review">
@@ -77,7 +97,12 @@
                 [ngModel]="reasonFor(job.id)"
                 (ngModelChange)="setReason(job.id, $event)"
               />
-              <button type="button" class="approve" (click)="approveJob(job)" [disabled]="busy() === job.id">
+              <button
+                type="button"
+                class="approve"
+                (click)="approveJob(job)"
+                [disabled]="busy() === job.id"
+              >
                 Approve
               </button>
               <button

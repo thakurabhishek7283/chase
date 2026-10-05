@@ -84,9 +84,7 @@ export class SlotConfigEditor {
   }
 
   addFieldMacro(): void {
-    this.edit((c) =>
-      c.field_macros.push({ name: '', arity: 1, content_arg: 1, label: 'field' }),
-    );
+    this.edit((c) => c.field_macros.push({ name: '', arity: 1, content_arg: 1, label: 'field' }));
   }
 
   removeFieldMacro(index: number): void {
@@ -148,5 +146,4 @@ export class SlotConfigEditor {
       },
     });
   }
-
 }

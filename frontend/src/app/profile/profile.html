@@ -35,20 +35,18 @@
     @if (emailChanged()) {
       <label>
         Current password
-        <input
-          type="password"
-          formControlName="current_password"
-          autocomplete="current-password"
-        />
+        <input type="password" formControlName="current_password" autocomplete="current-password" />
       </label>
-      <p class="hint">
-        This is the address you sign in with, so changing it needs your password.
-      </p>
+      <p class="hint">This is the address you sign in with, so changing it needs your password.</p>
     }
 
     <label>
       Current title
-      <input type="text" formControlName="current_title" placeholder="e.g. Senior Backend Engineer" />
+      <input
+        type="text"
+        formControlName="current_title"
+        placeholder="e.g. Senior Backend Engineer"
+      />
     </label>
 
     <label>

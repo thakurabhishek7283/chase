@@ -41,9 +41,7 @@ export class ResumeUpload implements OnInit {
   readonly corrections = signal<AppliedCorrection[]>([]);
   readonly verdict = signal('');
 
-  readonly canUpload = computed(
-    () => !!this.title().trim() && !!this.file() && !this.uploading(),
-  );
+  readonly canUpload = computed(() => !!this.title().trim() && !!this.file() && !this.uploading());
 
   /** Only engines that are actually installed; the rest would 503 on render. */
   readonly installedEngines = computed(() =>
