@@ -183,9 +183,7 @@ async def review_resume(
     return _drop_unknown_slots(resume, result.output)
 
 
-def _drop_unknown_slots(
-    resume: LatexResume, review: ResumeReviewResult
-) -> ResumeReviewResult:
+def _drop_unknown_slots(resume: LatexResume, review: ResumeReviewResult) -> ResumeReviewResult:
     known = {group.id for group in resume.groups} | {region.id for region in resume.regions}
     # A duplicate slot id would violate the review's unique index at insert
     # time; keeping the first is the same "salvage what resolved" instinct.

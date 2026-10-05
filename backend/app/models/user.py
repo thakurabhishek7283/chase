@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, DateTime
@@ -13,7 +13,7 @@ ROLES: tuple[str, ...] = ("user", "moderator", "admin")
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class User(SQLModel, table=True):
@@ -53,4 +53,3 @@ class User(SQLModel, table=True):
     @property
     def is_moderator(self) -> bool:
         return self.role in ("moderator", "admin")
-

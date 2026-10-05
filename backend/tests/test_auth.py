@@ -6,12 +6,10 @@ the shape of the bug this phase exists to prevent, so it is the shape the tests
 take.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
-
-from tests.conftest import MakeResume
 
 from app.core.security import (
     TokenError,
@@ -20,8 +18,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from tests.conftest import TEST_PASSWORD
-
+from tests.conftest import TEST_PASSWORD, MakeResume
 
 # --- the crypto seam ---------------------------------------------------------
 
@@ -52,7 +49,7 @@ def test_a_refresh_token_is_not_decodable_as_an_access_token() -> None:
     # The jti handed back is the one inside the token — the caller stores it as
     # the row key, so a mismatch would make every rotation look like a replay.
     assert decode_token(token, "refresh")["jti"] == jti
-    assert expires_at > datetime.now(timezone.utc)
+    assert expires_at > datetime.now(UTC)
     with pytest.raises(TokenError):
         decode_token(token, "access")
 
@@ -351,9 +348,9 @@ async def test_pending_company_is_usable_by_its_contributor_only(
 async def test_approval_publishes_to_everyone(
     user_client: AsyncClient, other_client: AsyncClient, admin_client: AsyncClient
 ) -> None:
-    company_id = (
-        await user_client.post("/api/v1/companies", json={"name": "Umbrella"})
-    ).json()["id"]
+    company_id = (await user_client.post("/api/v1/companies", json={"name": "Umbrella"})).json()[
+        "id"
+    ]
     assert (await other_client.get(f"/api/v1/companies/{company_id}")).status_code == 404
 
     approved = await admin_client.post(f"/api/v1/companies/{company_id}/approve")
@@ -390,9 +387,9 @@ async def test_moderation_endpoints_are_admin_only(user_client: AsyncClient) -> 
 async def test_approved_company_is_no_longer_contributor_editable(
     user_client: AsyncClient, admin_client: AsyncClient
 ) -> None:
-    company_id = (
-        await user_client.post("/api/v1/companies", json={"name": "Shared Co"})
-    ).json()["id"]
+    company_id = (await user_client.post("/api/v1/companies", json={"name": "Shared Co"})).json()[
+        "id"
+    ]
     # Editable while pending — that is the review conversation.
     assert (
         await user_client.patch(f"/api/v1/companies/{company_id}", json={"industry": "Retail"})
@@ -438,9 +435,9 @@ async def test_company_lookup_finds_the_row_before_submitting(
 async def test_job_profile_is_keyed_by_company_and_requisition_id(
     admin_client: AsyncClient,
 ) -> None:
-    company_id = (
-        await admin_client.post("/api/v1/companies", json={"name": "Keyed Co"})
-    ).json()["id"]
+    company_id = (await admin_client.post("/api/v1/companies", json={"name": "Keyed Co"})).json()[
+        "id"
+    ]
     payload = {
         "company_id": company_id,
         "external_job_id": "REQ-1234",
@@ -484,9 +481,7 @@ async def test_job_profiles_without_a_requisition_id_fall_back_to_title_and_loca
     assert clash.status_code == 409
 
     # A genuinely different location is a genuinely different posting.
-    berlin = await admin_client.post(
-        "/api/v1/job-profiles", json={**payload, "location": "Berlin"}
-    )
+    berlin = await admin_client.post("/api/v1/job-profiles", json={**payload, "location": "Berlin"})
     assert berlin.status_code == 201
 
 
@@ -499,7 +494,11 @@ async def test_job_profile_cannot_attach_to_an_invisible_company(
 
     response = await user_client.post(
         "/api/v1/job-profiles",
-        json={"company_id": hidden_id, "position_title": "Engineer", "description": "General engineering work on the core product."},
+        json={
+            "company_id": hidden_id,
+            "position_title": "Engineer",
+            "description": "General engineering work on the core product.",
+        },
     )
     assert response.status_code == 404
 
@@ -535,9 +534,9 @@ async def test_rejecting_a_company_releases_its_name(
 async def test_rejecting_a_posting_releases_its_requisition_id(
     user_client: AsyncClient, other_client: AsyncClient, admin_client: AsyncClient
 ) -> None:
-    company_id = (
-        await admin_client.post("/api/v1/companies", json={"name": "Reissue Co"})
-    ).json()["id"]
+    company_id = (await admin_client.post("/api/v1/companies", json={"name": "Reissue Co"})).json()[
+        "id"
+    ]
     payload = {
         "company_id": company_id,
         "external_job_id": "REQ-77",
@@ -570,7 +569,9 @@ async def test_pending_submissions_are_capped_per_user(
     assert "awaiting review" in blocked.json()["detail"]
 
 
-async def test_approval_frees_quota(user_client: AsyncClient, admin_client: AsyncClient, monkeypatch) -> None:
+async def test_approval_frees_quota(
+    user_client: AsyncClient, admin_client: AsyncClient, monkeypatch
+) -> None:
     """A good-faith contributor is never blocked for long."""
     from app.core.config import get_settings
 
@@ -578,10 +579,14 @@ async def test_approval_frees_quota(user_client: AsyncClient, admin_client: Asyn
 
     first = await user_client.post("/api/v1/companies", json={"name": "First Co"})
     assert first.status_code == 201
-    assert (await user_client.post("/api/v1/companies", json={"name": "Second Co"})).status_code == 429
+    assert (
+        await user_client.post("/api/v1/companies", json={"name": "Second Co"})
+    ).status_code == 429
 
     await admin_client.post(f"/api/v1/companies/{first.json()['id']}/approve")
-    assert (await user_client.post("/api/v1/companies", json={"name": "Second Co"})).status_code == 201
+    assert (
+        await user_client.post("/api/v1/companies", json={"name": "Second Co"})
+    ).status_code == 201
 
 
 async def test_admins_are_exempt_from_the_quota(admin_client: AsyncClient, monkeypatch) -> None:
@@ -600,18 +605,16 @@ async def test_admins_are_exempt_from_the_quota(admin_client: AsyncClient, monke
     "name",
     ["", " ", "x", "!!!", "aaaaaaaaaa", "123"],
 )
-async def test_obvious_junk_company_names_are_refused(
-    user_client: AsyncClient, name: str
-) -> None:
+async def test_obvious_junk_company_names_are_refused(user_client: AsyncClient, name: str) -> None:
     response = await user_client.post("/api/v1/companies", json={"name": name})
     assert response.status_code == 422, f"{name!r} was accepted"
 
 
 async def test_a_stub_job_description_is_refused(admin_client: AsyncClient) -> None:
     """Too short to score against a resume is too short to store."""
-    company_id = (
-        await admin_client.post("/api/v1/companies", json={"name": "Stub Co"})
-    ).json()["id"]
+    company_id = (await admin_client.post("/api/v1/companies", json={"name": "Stub Co"})).json()[
+        "id"
+    ]
     response = await admin_client.post(
         "/api/v1/job-profiles",
         json={"company_id": company_id, "position_title": "Engineer", "description": "job"},
@@ -675,9 +678,7 @@ async def test_admin_can_promote_and_deactivate(
 ) -> None:
     target_id = (await user_client.get("/api/v1/auth/me")).json()["id"]
 
-    promoted = await admin_client.patch(
-        f"/api/v1/users/{target_id}/role", json={"role": "admin"}
-    )
+    promoted = await admin_client.patch(f"/api/v1/users/{target_id}/role", json={"role": "admin"})
     assert promoted.status_code == 200
     assert promoted.json()["role"] == "admin"
 
@@ -692,9 +693,7 @@ async def test_admin_can_promote_and_deactivate(
 async def test_last_admin_cannot_be_demoted(admin_client: AsyncClient) -> None:
     """Otherwise the moderation queue becomes permanently unreachable."""
     admin_id = (await admin_client.get("/api/v1/auth/me")).json()["id"]
-    response = await admin_client.patch(
-        f"/api/v1/users/{admin_id}/role", json={"role": "user"}
-    )
+    response = await admin_client.patch(f"/api/v1/users/{admin_id}/role", json={"role": "user"})
     assert response.status_code == 409
 
 
@@ -725,9 +724,5 @@ async def test_moderator_role_and_moderation_permissions(
 
     # 5. Moderator cannot perform admin-only role changes
     user_id = (await user_client.get("/api/v1/auth/me")).json()["id"]
-    role_change = await other_client.patch(
-        f"/api/v1/users/{user_id}/role", json={"role": "admin"}
-    )
+    role_change = await other_client.patch(f"/api/v1/users/{user_id}/role", json={"role": "admin"})
     assert role_change.status_code == 403
-
-

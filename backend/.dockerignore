@@ -1,8 +1,17 @@
+# Only what the image needs: pyproject.toml, uv.lock, alembic*, app/, entrypoint.sh
 .venv/
-__pycache__/
 **/__pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+failure_dumps/
+tests/
 .env
+.env.*
+!.env.example
+Dockerfile
+.dockerignore
 .vscode/
+.idea/

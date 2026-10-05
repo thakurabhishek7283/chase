@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
@@ -41,7 +41,7 @@ async def purge_rejected(
     """
     settings = get_settings()
     days = retention_days if retention_days is not None else settings.rejected_retention_days
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
 
     summary = PurgeSummary(
         companies_deleted=await company_crud.purge_rejected(session, cutoff),

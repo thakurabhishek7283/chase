@@ -13,7 +13,13 @@ from app.services.latex import SlotConfig, parse, render
 from app.services.latex.failure_dump import dump_failure
 from app.services.latex.parser import LatexParseError
 from app.services.latex.patch_repair import repair_tailoring
-from app.services.latex.renderer import GroupEdit, LatexRenderError, RegionEdit, StaleEditError, TemplateDriftError
+from app.services.latex.renderer import (
+    GroupEdit,
+    LatexRenderError,
+    RegionEdit,
+    StaleEditError,
+    TemplateDriftError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +143,5 @@ async def apply_tailoring_with_repair(
             user_id=user_id,
             context="apply_tailoring_post_repair",
         )
-        logger.error(
-            "[apply_tailoring] AI repair did not fix the issue: %s", post_exc
-        )
+        logger.error("[apply_tailoring] AI repair did not fix the issue: %s", post_exc)
         raise post_exc

@@ -1,13 +1,7 @@
 import { ModerationStatus } from './auth.model';
 
 export type ExperienceTier =
-  | 'intern'
-  | 'junior'
-  | 'mid'
-  | 'senior'
-  | 'staff'
-  | 'principal'
-  | 'executive';
+  'intern' | 'junior' | 'mid' | 'senior' | 'staff' | 'principal' | 'executive';
 
 export interface JobProfile {
   id: string;

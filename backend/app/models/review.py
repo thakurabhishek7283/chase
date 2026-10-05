@@ -20,7 +20,7 @@ what they were originally offered.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Index, Uuid
@@ -37,7 +37,7 @@ SlotKind = ("group", "region")
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ResumeReview(SQLModel, table=True):
@@ -81,7 +81,9 @@ class ResumeReview(SQLModel, table=True):
 
     match_score: int
     summary: str
-    matched_keywords: list[str] = Field(default_factory=list, sa_column=Column(JSONB, nullable=False))
+    matched_keywords: list[str] = Field(
+        default_factory=list, sa_column=Column(JSONB, nullable=False)
+    )
     missing_keywords: list[dict[str, Any]] = Field(
         default_factory=list, sa_column=Column(JSONB, nullable=False)
     )

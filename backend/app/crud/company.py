@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import col, func, or_, select
@@ -11,16 +11,14 @@ from app.schemas.company import CompanyCreate, CompanyUpdate
 from app.services.slug import slugify_company
 
 
-async def create_company(
-    session: AsyncSession, data: CompanyCreate, *, author: User
-) -> Company:
+async def create_company(session: AsyncSession, data: CompanyCreate, *, author: User) -> Company:
     """Insert a proposed company, attributed to its contributor.
 
     An admin's own submission is approved on the spot — routing it into a queue
     they alone can clear would be a review of themselves by themselves.
     """
     approved = author.is_admin
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     company = Company(
         **data.model_dump(),
         slug=slugify_company(data.name),
@@ -74,9 +72,7 @@ async def list_companies(
         # first line of duplicate prevention, and it only helps if it
         # normalises the same way the unique index does.
         pattern = f"%{search.strip().lower()}%"
-        query = query.where(
-            or_(col(Company.name).ilike(pattern), col(Company.slug).ilike(pattern))
-        )
+        query = query.where(or_(col(Company.name).ilike(pattern), col(Company.slug).ilike(pattern)))
     result = await session.exec(query.order_by(col(Company.name)))
     return list(result.all())
 
@@ -85,9 +81,7 @@ async def get_company(session: AsyncSession, company_id: uuid.UUID) -> Company |
     return await session.get(Company, company_id)
 
 
-async def update_company(
-    session: AsyncSession, company: Company, data: CompanyUpdate
-) -> Company:
+async def update_company(session: AsyncSession, company: Company, data: CompanyUpdate) -> Company:
     fields = data.model_dump(exclude_unset=True)
     for field, value in fields.items():
         setattr(company, field, value)
@@ -95,7 +89,7 @@ async def update_company(
     # it or the dedup key would drift away from the name it describes.
     if "name" in fields and fields["name"] is not None:
         company.slug = slugify_company(fields["name"])
-    company.updated_at = datetime.now(timezone.utc)
+    company.updated_at = datetime.now(UTC)
     session.add(company)
     await session.commit()
     await session.refresh(company)
@@ -112,7 +106,7 @@ async def set_moderation_status(
 ) -> Company:
     company.status = status
     company.reviewed_by = reviewer.id
-    company.reviewed_at = datetime.now(timezone.utc)
+    company.reviewed_at = datetime.now(UTC)
     company.rejection_reason = reason
     company.updated_at = company.reviewed_at
     session.add(company)

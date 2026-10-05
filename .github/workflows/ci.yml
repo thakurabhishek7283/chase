@@ -2,64 +2,113 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   backend:
-    name: Backend (pytest)
+    name: Backend · lint + tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     services:
       postgres:
-        image: pgvector/pgvector:pg17
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: jarvis
           POSTGRES_PASSWORD: jarvis_dev_password
           POSTGRES_DB: jarvis_test
-        ports:
-          - 5432:5432
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U jarvis -d jarvis_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      # The LaTeX worker is a stdlib-only HTTP wrapper around the engines, so CI
-      # runs it directly on Debian's TeX Live instead of building the image.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra local-embeddings
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      # The suite compiles real documents, so it needs a real worker. The
+      # worker is a stdlib-only HTTP wrapper around the engines, so it runs
+      # directly on Debian's TeX Live here — minutes faster than a cold build
+      # of the image, which the `images` job below still builds and caches.
       - name: LaTeX engines
+        working-directory: .
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
             texlive-xetex texlive-luatex latexmk
-      - name: Start the LaTeX worker
+      - name: Start LaTeX worker
+        working-directory: .
         run: |
           nohup python3 latex-worker/server.py > latex-worker.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://localhost:8100/health && break; sleep 1; done
+          for i in $(seq 1 30); do curl -fsS http://localhost:8100/health && exit 0; sleep 1; done
+          cat latex-worker.log; exit 1
 
-      - uses: astral-sh/setup-uv@v6
-      - name: Install
-        working-directory: backend
-        run: uv sync --frozen
       - name: Test
-        working-directory: backend
-        run: uv run pytest -q
+        env:
+          JARVIS_TEST_DATABASE_URL: postgresql+asyncpg://jarvis:jarvis_dev_password@localhost:5432/jarvis_test
+          LATEX_WORKER_URL: http://localhost:8100
+        run: uv run pytest --cov --cov-report=term-missing:skip-covered
 
   frontend:
-    name: Frontend (build + test)
+    name: Frontend · format + tests + build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npx ng build
-      - run: npx ng test --watch=false
+      - run: npm ci --no-audit --no-fund
+      - run: npm run format:check
+      - run: npm run test:ci
+      - run: npm run build
+
+  images:
+    name: Docker · ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, frontend, latex-worker]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.image }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+      - name: Validate compose files
+        if: matrix.image == 'backend'
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet

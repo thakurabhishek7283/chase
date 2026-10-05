@@ -18,7 +18,7 @@ anyone has asked to see, and keeping it would make the common read a sort.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Index, Uuid
@@ -27,7 +27,7 @@ from sqlmodel import Field, SQLModel
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ResumeScore(SQLModel, table=True):

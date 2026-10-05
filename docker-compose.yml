@@ -1,58 +1,74 @@
-# One-command way to run the whole stack: `docker compose up --build`.
+# The whole stack, one command:
 #
-# Code is baked into the backend/frontend images at build time, not bind-
-# mounted — this is meant to be the "clone it and it just works" path, not a
-# hot-reload dev loop. After changing backend/ or frontend/ code, re-run with
-# `--build`. For active development, `README.md`'s native uv/npm setup still
-# gives you reload-on-save.
+#   docker compose up -d --build     # build the images from this checkout
+#   docker compose pull && docker compose up -d   # or use the published images
+#
+# then open http://localhost:8080. Only the frontend publishes a port: nginx
+# serves the UI and proxies /api (and /docs) to the backend, so Postgres, the
+# API and the LaTeX worker stay on the internal network.
+#
+# Configuration: backend/.env (optional — copy backend/.env.example) for the
+# app itself, and a root .env (optional — copy .env.example) for the few
+# values this file interpolates. Without either, everything starts; the AI
+# features answer 503 until GOOGLE_API_KEY is set.
+#
+# For native development against containerised Postgres + LaTeX, layer on
+# docker-compose.dev.yml — see the README.
+
+name: jarvis
 
 services:
   postgres:
     image: pgvector/pgvector:pg18
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: jarvis_dev_password
-      POSTGRES_DB: jarvis
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-jarvis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jarvis_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jarvis}
     volumes:
       # pg18's image stores data under /var/lib/postgresql (a version-specific
       # subdirectory beneath it), not /var/lib/postgresql/data — mounting at
       # the old path makes the entrypoint refuse to start.
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   # A normal, Compose-managed service — not something the backend creates or
   # execs into itself. The backend only ever makes HTTP requests to it (see
-  # app/services/latex/compiler.py and latex-worker/server.py), so unlike an
-  # earlier version of this file, the backend needs no access to the Docker
-  # socket at all to get a PDF out of this.
+  # app/services/latex/compiler.py and latex-worker/server.py), so it needs no
+  # access to the Docker socket to get a PDF out of this.
   latex-worker:
+    image: ghcr.io/thakurabhishek7283/chase-latex-worker:${JARVIS_VERSION:-latest}
     build: ./latex-worker
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
+    # It compiles untrusted documents. Shell escape is already off and the
+    # process is unprivileged; this takes away what it never needs anyway.
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
 
   backend:
+    image: ghcr.io/thakurabhishek7283/chase-backend:${JARVIS_VERSION:-latest}
     build: ./backend
+    restart: unless-stopped
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     environment:
-      # Override whatever backend/.env says, since inside this network the
-      # database and the LaTeX worker are reachable by service name, not
-      # `localhost`.
-      DATABASE_URL: postgresql+asyncpg://jarvis:jarvis_dev_password@postgres:5432/jarvis
+      # Inside this network, the database and LaTeX worker are reached by
+      # service name, not `localhost` — these override backend/.env.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-jarvis}:${POSTGRES_PASSWORD:-jarvis_dev_password}@postgres:5432/${POSTGRES_DB:-jarvis}
       LATEX_WORKER_URL: http://latex-worker:8100
-    ports:
-      - "8000:8000"
+      # Only the frontend's nginx can reach this container, and it overwrites
+      # X-Forwarded-For with the real peer — so that header is trustworthy here.
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      # The generated JWT key (unless JWT_SECRET_KEY is set), the downloaded
+      # embedding model, and LaTeX failure dumps.
+      - backend-data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,11 +76,15 @@ services:
         condition: service_healthy
 
   frontend:
+    image: ghcr.io/thakurabhishek7283/chase-frontend:${JARVIS_VERSION:-latest}
     build: ./frontend
+    restart: unless-stopped
     ports:
-      - "4200:4200"
+      - "${APP_PORT:-8080}:8080"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   pgdata:
+  backend-data:

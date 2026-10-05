@@ -16,8 +16,7 @@ export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  const rejected = () =>
-    router.createUrlTree(['/login'], { queryParams: { redirect: state.url } });
+  const rejected = () => router.createUrlTree(['/login'], { queryParams: { redirect: state.url } });
 
   if (!auth.isAuthenticated()) {
     return rejected();

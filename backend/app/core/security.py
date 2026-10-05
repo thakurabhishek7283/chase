@@ -7,7 +7,7 @@ tokens meet HTTP.
 
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 import jwt
@@ -59,7 +59,7 @@ def _encode(
     **claims: Any,
 ) -> str:
     settings = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(subject),
         "type": token_type,
@@ -73,9 +73,7 @@ def _encode(
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(
-    user_id: uuid.UUID, *, expires_in: timedelta | None = None
-) -> str:
+def create_access_token(user_id: uuid.UUID, *, expires_in: timedelta | None = None) -> str:
     """Short-lived request credential.
 
     Carries the subject and nothing else. Embedding the role here was tempting
@@ -92,9 +90,7 @@ def create_access_token(
     )
 
 
-def create_refresh_token(
-    user_id: uuid.UUID, token_version: int
-) -> tuple[str, str, datetime]:
+def create_refresh_token(user_id: uuid.UUID, token_version: int) -> tuple[str, str, datetime]:
     """Long-lived token, redeemable only while it matches the user's version.
 
     `token_version` revokes every session at once — the right response to a
@@ -103,9 +99,7 @@ def create_refresh_token(
     `refresh_tokens`.
     """
     settings = get_settings()
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        days=settings.refresh_token_expire_days
-    )
+    expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
     jti = secrets.token_urlsafe(12)
     token = _encode(
         user_id,

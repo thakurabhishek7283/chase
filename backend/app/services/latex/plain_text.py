@@ -49,9 +49,19 @@ _REMAINING_COMMAND = re.compile(r"\\[A-Za-z@]+\*?(\s*\[[^\]]*\])?")
 #: handled by the unescape table below, so the lookbehind matters.
 _MATH_DELIMITER = re.compile(r"(?<!\\)\$")
 _UNESCAPE = [
-    (r"\textbackslash{}", "\\"), (r"\&", "&"), (r"\%", "%"), (r"\$", "$"),
-    (r"\#", "#"), (r"\_", "_"), (r"\{", "{"), (r"\}", "}"),
-    (r"\ldots", "..."), (r"\dots", "..."), ("---", "-"), ("--", "-"), ("~", " "),
+    (r"\textbackslash{}", "\\"),
+    (r"\&", "&"),
+    (r"\%", "%"),
+    (r"\$", "$"),
+    (r"\#", "#"),
+    (r"\_", "_"),
+    (r"\{", "{"),
+    (r"\}", "}"),
+    (r"\ldots", "..."),
+    (r"\dots", "..."),
+    ("---", "-"),
+    ("--", "-"),
+    ("~", " "),
 ]
 
 

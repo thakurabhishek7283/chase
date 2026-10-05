@@ -11,7 +11,10 @@
       <option value="" disabled>Select a company</option>
       @for (company of companies(); track company.id) {
         <option [value]="company.id">
-          {{ company.name }}@if (company.status !== 'approved') { — {{ company.status }} }
+          {{ company.name }}
+          @if (company.status !== 'approved') {
+            — {{ company.status }}
+          }
         </option>
       }
     </select>

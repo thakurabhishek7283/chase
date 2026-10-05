@@ -164,7 +164,9 @@ def _scan_macro_lists(masked: str, config: SlotConfig) -> list[tuple[str, int, i
             open_end = max(candidates)
             opens.remove(open_end)
             name = start_macro.lstrip("\\")
-            found.append((name, open_end - len(start_macro), open_end, close, close + len(end_macro)))
+            found.append(
+                (name, open_end - len(start_macro), open_end, close, close + len(end_macro))
+            )
     return found
 
 
@@ -210,9 +212,7 @@ def _find_marked_regions(source: str) -> list[MarkedRegion]:
             )
         span = _strip_span(source, begin.end(), end.start())
         regions.append(
-            MarkedRegion(
-                id="", label=begin.group(1).strip(), span=span, latex=span.text(source)
-            )
+            MarkedRegion(id="", label=begin.group(1).strip(), span=span, latex=span.text(source))
         )
     return regions
 
@@ -284,9 +284,7 @@ def _standalone_runs(
     return groups
 
 
-def _contiguous_runs(
-    source: str, calls: list[tuple[Span, Span]]
-) -> list[list[tuple[Span, Span]]]:
+def _contiguous_runs(source: str, calls: list[tuple[Span, Span]]) -> list[list[tuple[Span, Span]]]:
     """Split calls into runs separated by nothing but whitespace."""
     runs: list[list[tuple[Span, Span]]] = []
     current: list[tuple[Span, Span]] = []
@@ -300,9 +298,7 @@ def _contiguous_runs(
     return runs
 
 
-def _run_group(
-    source: str, name: str, run: list[tuple[Span, Span]], group_id: str
-) -> ItemGroup:
+def _run_group(source: str, name: str, run: list[tuple[Span, Span]], group_id: str) -> ItemGroup:
     """Build a standalone group whose span covers the macro calls themselves."""
     bullets = [
         Bullet(id=f"{group_id}-b{number}", span=inner, latex=inner.text(source))
@@ -361,9 +357,7 @@ def _find_sections(source: str, masked: str, body: Span, macros: list[str]) -> l
     sections: list[Section] = []
     if not starts or starts[0][0] > body.start:
         first_end = starts[0][0] if starts else body.end
-        sections.append(
-            Section(id="s0", heading="Header", span=Span(body.start, first_end))
-        )
+        sections.append(Section(id="s0", heading="Header", span=Span(body.start, first_end)))
     for number, (start, heading) in enumerate(starts, start=1):
         stop = starts[number][0] if number < len(starts) else body.end
         sections.append(
@@ -412,8 +406,11 @@ def parse(source: str, config: SlotConfig | None = None) -> LatexResume:
     for name, _begin_start, body_start, body_end, _end_stop in candidates:
         # A list wrapping another list is scaffolding, not a bullet list; only
         # the innermost one holds editable text.
-        if any(body_start <= other[2] and other[3] <= body_end for other in candidates
-               if (other[2], other[3]) != (body_start, body_end)):
+        if any(
+            body_start <= other[2] and other[3] <= body_end
+            for other in candidates
+            if (other[2], other[3]) != (body_start, body_end)
+        ):
             continue
         group_body = Span(body_start, body_end)
         number += 1
@@ -459,7 +456,9 @@ def parse(source: str, config: SlotConfig | None = None) -> LatexResume:
         region.id = f"r{number}"
 
     for section in sections:
-        section.groups = [g for g in groups if section.span.start <= g.span.start < section.span.end]
+        section.groups = [
+            g for g in groups if section.span.start <= g.span.start < section.span.end
+        ]
         section.regions = [
             r for r in regions if section.span.start <= r.span.start < section.span.end
         ]

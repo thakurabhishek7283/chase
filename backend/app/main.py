@@ -1,7 +1,13 @@
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import __version__
 from app.core.config import get_settings
+from app.core.db import engine
 from app.routers import (
     admin,
     auth,
@@ -17,7 +23,29 @@ from app.routers import (
 
 settings = get_settings()
 
-app = FastAPI(title="Interview Tracker & Resume Optimizer API")
+# uvicorn configures its own loggers but leaves the root logger alone, so
+# without this every `logging.getLogger(__name__)` under `app.` would only
+# surface at WARNING and above, through Python's last-resort handler.
+logging.basicConfig(
+    level=settings.log_level.upper(),
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    yield
+    # Close pooled connections on shutdown, so a rolling restart does not leave
+    # Postgres holding sockets until they time out.
+    await engine.dispose()
+
+
+app = FastAPI(
+    title="Interview Tracker & Resume Optimizer API",
+    summary="Semantic job matching and template-preserving, ATS-scored LaTeX resume tailoring.",
+    version=__version__,
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,13 +58,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health.router, prefix="/api/v1")
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(users.router, prefix="/api/v1")
-app.include_router(companies.router, prefix="/api/v1")
-app.include_router(job_profiles.router, prefix="/api/v1")
-app.include_router(resumes.router, prefix="/api/v1")
-app.include_router(reviews.router, prefix="/api/v1")
-app.include_router(scores.router, prefix="/api/v1")
-app.include_router(matching.router, prefix="/api/v1")
-app.include_router(admin.router, prefix="/api/v1")
+for module in (
+    health,
+    auth,
+    users,
+    companies,
+    job_profiles,
+    resumes,
+    reviews,
+    scores,
+    matching,
+    admin,
+):
+    app.include_router(module.router, prefix="/api/v1")

@@ -36,7 +36,7 @@ def _slug_or_422(name: str) -> str:
         return slugify_company(name)
     except InvalidCompanyNameError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
 
 
@@ -101,9 +101,7 @@ async def lookup_company(
 
 
 @router.get("/{company_id}", response_model=CompanyRead)
-async def get_company(
-    company_id: uuid.UUID, session: SessionDep, user: CurrentUser
-) -> CompanyRead:
+async def get_company(company_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> CompanyRead:
     company = await require_visible_company(session, company_id, user)
     return CompanyRead.model_validate(company)
 

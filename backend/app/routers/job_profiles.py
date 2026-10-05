@@ -60,12 +60,8 @@ async def create_job_profile(
     )
     if existing is not None:
         raise _duplicate(existing)
-    require_submission_quota(
-        await crud.count_pending_for(session, user.id), user, "job profile"
-    )
-    return JobProfileRead.model_validate(
-        await crud.create_job_profile(session, data, author=user)
-    )
+    require_submission_quota(await crud.count_pending_for(session, user.id), user, "job profile")
+    return JobProfileRead.model_validate(await crud.create_job_profile(session, data, author=user))
 
 
 @router.get("", response_model=list[JobProfileRead])
@@ -104,7 +100,8 @@ async def update_job_profile(
     # An edit can move a posting onto another posting's identity, so the same
     # duplicate check the create path runs has to run here too.
     merged_external = (
-        data.external_job_id if "external_job_id" in data.model_fields_set
+        data.external_job_id
+        if "external_job_id" in data.model_fields_set
         else job_profile.external_job_id
     )
     clash = await crud.find_duplicate(
@@ -116,9 +113,7 @@ async def update_job_profile(
     )
     if clash is not None and clash.id != job_profile.id:
         raise _duplicate(clash)
-    return JobProfileRead.model_validate(
-        await crud.update_job_profile(session, job_profile, data)
-    )
+    return JobProfileRead.model_validate(await crud.update_job_profile(session, job_profile, data))
 
 
 @router.post("/{job_profile_id}/approve", response_model=JobProfileRead)

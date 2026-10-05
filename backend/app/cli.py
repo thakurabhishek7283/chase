@@ -211,7 +211,9 @@ def main() -> int:
     create.add_argument("email")
     create.add_argument("--name", default=None)
 
-    promote_mod = sub.add_parser("promote-moderator", help="Grant moderator role to an existing account")
+    promote_mod = sub.add_parser(
+        "promote-moderator", help="Grant moderator role to an existing account"
+    )
     promote_mod.add_argument("email")
 
     create_mod = sub.add_parser("create-moderator", help="Create a new moderator account")

@@ -14,6 +14,7 @@ from app.core import throttle
 from app.core.config import get_settings
 from app.models.audit import AuditLog
 from app.models.session import RefreshToken
+
 #: Aliased on import: pytest tries to *collect* a module-level name starting
 #: with `test_`, and warns when it turns out to be a sessionmaker.
 from tests.conftest import TEST_PASSWORD, MakeResume
@@ -73,9 +74,9 @@ async def test_replaying_a_refresh_token_revokes_the_whole_family(
         )
     ).json()["refresh_token"]
 
-    legitimate = (
-        await client.post("/api/v1/auth/refresh", json={"refresh_token": stolen})
-    ).json()["refresh_token"]
+    legitimate = (await client.post("/api/v1/auth/refresh", json={"refresh_token": stolen})).json()[
+        "refresh_token"
+    ]
 
     # The thief redeems the copy they took.
     replay = await client.post("/api/v1/auth/refresh", json={"refresh_token": stolen})
@@ -144,6 +145,33 @@ async def test_repeated_bad_passwords_start_being_refused(client: AsyncClient) -
     )
     assert locked_out.status_code == 429
     assert "Retry-After" in locked_out.headers
+
+
+async def test_a_spoofed_forwarded_for_does_not_reset_the_registration_limit(
+    client: AsyncClient,
+) -> None:
+    """The limiter key once came from `X-Forwarded-For`, which the caller writes.
+
+    A fresh header value per request was a fresh budget per request — unlimited
+    signups. Trusting that header is uvicorn's job (`--proxy-headers` plus
+    `FORWARDED_ALLOW_IPS`), never the application's.
+    """
+    settings = get_settings()
+    codes = [
+        (
+            await client.post(
+                "/api/v1/auth/register",
+                headers={"X-Forwarded-For": f"203.0.113.{i}"},
+                json={
+                    "full_name": "S",
+                    "email": f"spoof{i}@example.com",
+                    "password": TEST_PASSWORD,
+                },
+            )
+        ).status_code
+        for i in range(settings.register_max_attempts + 1)
+    ]
+    assert codes[-1] == 429, codes
 
 
 async def test_a_successful_sign_in_clears_the_count(client: AsyncClient) -> None:
@@ -231,9 +259,7 @@ async def test_job_matches_are_refused_even_to_admins(
 async def test_changing_email_without_the_password_is_refused(
     user_client: AsyncClient,
 ) -> None:
-    response = await user_client.patch(
-        "/api/v1/auth/me", json={"email": "hijacked@example.com"}
-    )
+    response = await user_client.patch("/api/v1/auth/me", json={"email": "hijacked@example.com"})
     assert response.status_code == 403
     assert (await me(user_client))["email"] == "user@example.com"
 
@@ -249,9 +275,7 @@ async def test_changing_email_with_the_password_succeeds(user_client: AsyncClien
 
 async def test_an_ordinary_profile_edit_needs_no_password(user_client: AsyncClient) -> None:
     """The password is the price of moving the *identity*, not of editing a title."""
-    response = await user_client.patch(
-        "/api/v1/auth/me", json={"current_title": "Staff Engineer"}
-    )
+    response = await user_client.patch("/api/v1/auth/me", json={"current_title": "Staff Engineer"})
     assert response.status_code == 200
     assert response.json()["current_title"] == "Staff Engineer"
 

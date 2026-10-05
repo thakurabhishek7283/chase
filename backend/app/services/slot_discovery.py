@@ -31,8 +31,8 @@ the author knows which of their lines are facts.
 from app.ai.slot_schema import SlotSchema
 from app.core.config import get_settings
 from app.services.latex.config import BulletMacro, FieldMacro, ListPair, SlotConfig, SlotConfigError
-from app.services.latex.parser import LatexParseError, parse
 from app.services.latex.model import LatexResume
+from app.services.latex.parser import LatexParseError, parse
 from app.services.latex.safety import forbidden_command
 
 
@@ -155,5 +155,3 @@ def _builtin_editable(source: str, section_macros: list[str]) -> int:
         return 0
     spans = [group.span for group in default.groups] + [r.span for r in default.regions]
     return sum(span.end - span.start for span in spans)
-
-

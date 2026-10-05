@@ -24,8 +24,8 @@ from pydantic_ai import Agent
 from app.ai.limits import run_agent
 from app.ai.provider import resolve_model
 from app.ai.schemas import ResumeTailoring, TailoredGroup, TailoredRegion
-from app.services.latex.renderer import LatexRenderError
 from app.services.latex.parser import LatexParseError
+from app.services.latex.renderer import LatexRenderError
 
 if TYPE_CHECKING:
     pass
@@ -103,6 +103,7 @@ def _get_repair_agent() -> Agent[None, RepairedPatch]:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def _build_repair_prompt(error: str, tailoring: ResumeTailoring) -> str:
     lines: list[str] = [
         f"## Error\n{error}\n",
@@ -115,9 +116,7 @@ def _build_repair_prompt(error: str, tailoring: ResumeTailoring) -> str:
     for r in tailoring.regions:
         lines.append(f"\n[region {r.region_id}]")
         lines.append(r.latex)
-    lines.append(
-        "\nReturn the corrected patch. Keep all group_ids and region_ids unchanged."
-    )
+    lines.append("\nReturn the corrected patch. Keep all group_ids and region_ids unchanged.")
     return "\n".join(lines)
 
 
@@ -165,15 +164,9 @@ async def repair_tailoring(
         repaired_group_map = {g.group_id: g for g in repaired.groups}
         repaired_region_map = {r.region_id: r for r in repaired.regions}
 
-        new_groups = [
-            repaired_group_map.get(g.group_id, g) for g in current.groups
-        ]
-        new_regions = [
-            repaired_region_map.get(r.region_id, r) for r in current.regions
-        ]
-        current = current.model_copy(
-            update={"groups": new_groups, "regions": new_regions}
-        )
+        new_groups = [repaired_group_map.get(g.group_id, g) for g in current.groups]
+        new_regions = [repaired_region_map.get(r.region_id, r) for r in current.regions]
+        current = current.model_copy(update={"groups": new_groups, "regions": new_regions})
         if repaired.repair_notes:
             notes.append(f"[attempt {attempt}] {repaired.repair_notes}")
             logger.info("[patch_repair] %s", repaired.repair_notes)

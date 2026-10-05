@@ -13,7 +13,18 @@ def _load_model(model_name: str):
             "The local embedding provider requires fastembed. "
             "Install it with: uv sync --extra local-embeddings"
         ) from exc
-    return TextEmbedding(model_name=model_name)
+    try:
+        return TextEmbedding(model_name=model_name)
+    except Exception as exc:
+        # The first use downloads the weights. Offline, behind a proxy, or with
+        # the model host down, that is an unavailable dependency — the routes
+        # answer 503 for it — not a bug worth a 500. Nothing is cached on
+        # failure (lru_cache skips exceptions), so the next request retries.
+        raise EmbeddingError(
+            f"fastembed could not load the embedding model {model_name!r}: {exc}. "
+            "The first use downloads it, so the server needs to reach huggingface.co "
+            "once; set FASTEMBED_CACHE_PATH to keep the download between restarts."
+        ) from exc
 
 
 class LocalEmbeddingProvider(EmbeddingProvider):

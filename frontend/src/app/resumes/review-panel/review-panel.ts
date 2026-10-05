@@ -140,9 +140,7 @@ export class ReviewPanel implements OnDestroy {
       next: (blob) => {
         this.releasePreview();
         this.previewObjectUrl = URL.createObjectURL(blob);
-        this.previewUrl.set(
-          this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl),
-        );
+        this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl));
         this.rendering.set(false);
       },
       error: async (err) => {
@@ -163,8 +161,7 @@ export class ReviewPanel implements OnDestroy {
         link.click();
         URL.revokeObjectURL(url);
       },
-      error: async (err) =>
-        this.error.set(await detailFrom(err, 'Could not produce the source.')),
+      error: async (err) => this.error.set(await detailFrom(err, 'Could not produce the source.')),
     });
   }
 

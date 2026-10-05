@@ -41,9 +41,7 @@ def resolve_model() -> "Model | str":
     from pydantic_ai.models.google import GoogleModel
     from pydantic_ai.providers.google import GoogleProvider
 
-    return GoogleModel(
-        settings.ats_model, provider=GoogleProvider(api_key=settings.google_api_key)
-    )
+    return GoogleModel(settings.ats_model, provider=GoogleProvider(api_key=settings.google_api_key))
 
 
 def has_llm_credentials() -> bool:

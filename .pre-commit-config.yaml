@@ -1,0 +1,37 @@
+# Optional local hooks mirroring CI:  pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+        exclude: tsconfig.*\.json$  # tsconfig allows comments
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  # Through uv, so the hooks use exactly the ruff version CI locks.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (backend)
+        language: system
+        entry: sh -c 'cd backend && uv run --frozen ruff check --fix .'
+        files: ^backend/.*\.py$
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format (backend)
+        language: system
+        entry: sh -c 'cd backend && uv run --frozen ruff format .'
+        files: ^backend/.*\.py$
+        pass_filenames: false
+      - id: prettier
+        name: prettier (frontend)
+        language: system
+        entry: sh -c 'cd frontend && npx --no-install prettier --check "src/**/*.{ts,html,scss}"'
+        files: ^frontend/src/
+        pass_filenames: false

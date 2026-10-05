@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://jarvis:jarvis_dev_password@localhost:5432/jarvis"
     cors_origins: str = "http://localhost:4200"
+    #: Level for the `app.*` loggers (DEBUG, INFO, WARNING, ...).
+    log_level: str = "INFO"
 
     # --- Phase 6: authentication & authorization -----------------------------
     #: HMAC key for signing JWTs. Unset means a per-process random key — fine
@@ -99,7 +101,7 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"JWT_SECRET_KEY must be at least {self.MIN_JWT_SECRET_BYTES} bytes "
                     "(RFC 7518 §3.2). Generate one with: "
-                    "python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+                    'python -c "import secrets; print(secrets.token_urlsafe(48))"'
                 )
             return self.jwt_secret_key
         logger.warning(

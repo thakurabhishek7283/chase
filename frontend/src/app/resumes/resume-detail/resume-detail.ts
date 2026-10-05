@@ -195,9 +195,7 @@ export class ResumeDetail implements OnInit {
   }
 
   jobTitle(jobProfileId: string): string {
-    return (
-      this.jobProfiles().find((job) => job.id === jobProfileId)?.position_title ?? 'a role'
-    );
+    return this.jobProfiles().find((job) => job.id === jobProfileId)?.position_title ?? 'a role';
   }
 
   // --- the document itself --------------------------------------------------

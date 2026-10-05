@@ -3,7 +3,9 @@
     <div class="where">
       <span class="section">{{ patch().section_heading }}</span>
       <span class="slot">{{ patch().slot_id }}</span>
-      <span class="chip" [class]="patch().severity">{{ patch().severity.split('_').join(' ') }}</span>
+      <span class="chip" [class]="patch().severity">{{
+        patch().severity.split('_').join(' ')
+      }}</span>
     </div>
     <span class="status">{{ statusLabel() }}</span>
   </header>

@@ -170,7 +170,10 @@ async def test_refresh_rescores_a_score_that_was_not_stale(
 
 
 async def test_another_users_resume_cannot_be_scored_or_read(
-    user_client: AsyncClient, other_client: AsyncClient, make_resume, job_id: str,
+    user_client: AsyncClient,
+    other_client: AsyncClient,
+    make_resume,
+    job_id: str,
     scorer: ScoreCounter,
 ) -> None:
     resume_id = await make_resume(user_client)
@@ -179,7 +182,5 @@ async def test_another_users_resume_cannot_be_scored_or_read(
             f"/api/v1/resumes/{resume_id}/scores", json={"job_profile_id": job_id}
         )
     ).status_code == 404
-    assert (
-        await other_client.get(f"/api/v1/resumes/{resume_id}/scores")
-    ).status_code == 404
+    assert (await other_client.get(f"/api/v1/resumes/{resume_id}/scores")).status_code == 404
     assert scorer.calls == 0

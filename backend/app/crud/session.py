@@ -11,7 +11,7 @@ rotation becomes theatre:
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -23,9 +23,7 @@ async def start_family(
     session: AsyncSession, *, jti: str, user_id: uuid.UUID, expires_at: datetime
 ) -> RefreshToken:
     """Record the first refresh token of a new sign-in."""
-    row = RefreshToken(
-        jti=jti, user_id=user_id, family_id=uuid.uuid4(), expires_at=expires_at
-    )
+    row = RefreshToken(jti=jti, user_id=user_id, family_id=uuid.uuid4(), expires_at=expires_at)
     session.add(row)
     return row
 
@@ -38,9 +36,7 @@ async def continue_family(
     family_id: uuid.UUID,
     expires_at: datetime,
 ) -> RefreshToken:
-    row = RefreshToken(
-        jti=jti, user_id=user_id, family_id=family_id, expires_at=expires_at
-    )
+    row = RefreshToken(jti=jti, user_id=user_id, family_id=family_id, expires_at=expires_at)
     session.add(row)
     return row
 
@@ -50,12 +46,10 @@ async def get(session: AsyncSession, jti: str) -> RefreshToken | None:
 
 
 def mark_used(row: RefreshToken) -> None:
-    row.used_at = datetime.now(timezone.utc)
+    row.used_at = datetime.now(UTC)
 
 
-async def revoke_family(
-    session: AsyncSession, family_id: uuid.UUID, reason: str
-) -> int:
+async def revoke_family(session: AsyncSession, family_id: uuid.UUID, reason: str) -> int:
     """Kill every unrevoked token descended from one sign-in.
 
     A bulk UPDATE rather than a load-and-loop: this runs on the reuse-detection
@@ -68,14 +62,12 @@ async def revoke_family(
             col(RefreshToken.family_id) == family_id,
             col(RefreshToken.revoked_at).is_(None),
         )
-        .values(revoked_at=datetime.now(timezone.utc), revoked_reason=reason)
+        .values(revoked_at=datetime.now(UTC), revoked_reason=reason)
     )
     return int(result.rowcount or 0)
 
 
-async def revoke_all_for_user(
-    session: AsyncSession, user_id: uuid.UUID, reason: str
-) -> int:
+async def revoke_all_for_user(session: AsyncSession, user_id: uuid.UUID, reason: str) -> int:
     """Used by logout-everywhere, password change, and deactivation.
 
     `users.token_version` already invalidates the tokens cryptographically;
@@ -88,7 +80,7 @@ async def revoke_all_for_user(
             col(RefreshToken.user_id) == user_id,
             col(RefreshToken.revoked_at).is_(None),
         )
-        .values(revoked_at=datetime.now(timezone.utc), revoked_reason=reason)
+        .values(revoked_at=datetime.now(UTC), revoked_reason=reason)
     )
     return int(result.rowcount or 0)
 
@@ -100,11 +92,9 @@ async def purge_expired(session: AsyncSession, *, before: datetime | None = None
     the JWT's own `exp` is checked first. It exists so the table does not grow
     forever on a long-lived instance.
     """
-    cutoff = before or datetime.now(timezone.utc)
+    cutoff = before or datetime.now(UTC)
     rows = (
-        await session.exec(
-            select(RefreshToken).where(col(RefreshToken.expires_at) < cutoff)
-        )
+        await session.exec(select(RefreshToken).where(col(RefreshToken.expires_at) < cutoff))
     ).all()
     for row in rows:
         await session.delete(row)

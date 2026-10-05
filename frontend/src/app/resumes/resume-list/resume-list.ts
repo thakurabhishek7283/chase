@@ -79,8 +79,7 @@ export class ResumeList implements OnInit {
   remove(id: string): void {
     this.resumes.delete(id).subscribe({
       next: () => this.reload(),
-      error: async (err) =>
-        this.error.set(await detailFrom(err, 'Could not delete that resume.')),
+      error: async (err) => this.error.set(await detailFrom(err, 'Could not delete that resume.')),
     });
   }
 }

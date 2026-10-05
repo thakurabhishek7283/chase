@@ -69,9 +69,7 @@ async def _issue(
     settings = get_settings()
     refresh, jti, expires_at = create_refresh_token(user.id, user.token_version)
     if family_id is None:
-        await session_crud.start_family(
-            session, jti=jti, user_id=user.id, expires_at=expires_at
-        )
+        await session_crud.start_family(session, jti=jti, user_id=user.id, expires_at=expires_at)
     else:
         await session_crud.continue_family(
             session, jti=jti, user_id=user.id, family_id=family_id, expires_at=expires_at
@@ -83,9 +81,7 @@ async def _issue(
     )
 
 
-async def _authenticate(
-    session: AsyncSession, request: Request, email: str, password: str
-) -> User:
+async def _authenticate(session: AsyncSession, request: Request, email: str, password: str) -> User:
     """Check credentials, with the rate limiter wrapped around the whole path.
 
     The limiter is consulted before any work is done and charged only on
@@ -147,9 +143,7 @@ async def _authenticate(
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def register(
-    data: RegisterRequest, session: SessionDep, request: Request
-) -> UserRead:
+async def register(data: RegisterRequest, session: SessionDep, request: Request) -> UserRead:
     """Create an account.
 
     The 409 below is an account-existence oracle, and an unavoidable one: with
@@ -232,9 +226,7 @@ async def refresh(data: RefreshRequest, session: SessionDep) -> TokenPair:
         user_id = subject_of(payload)
         jti = jti_of(payload)
     except TokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     record = await session_crud.get(session, jti)
     if record is None:
@@ -274,9 +266,7 @@ async def read_me(user: CurrentUser) -> UserRead:
 
 
 @router.patch("/me", response_model=UserRead)
-async def update_me(
-    data: EmailChangeRequest, session: SessionDep, user: CurrentUser
-) -> UserRead:
+async def update_me(data: EmailChangeRequest, session: SessionDep, user: CurrentUser) -> UserRead:
     """Edit the caller's own profile.
 
     Changing `email` changes the identity this account signs in with, so that
@@ -296,9 +286,7 @@ async def update_me(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="An account with that email already exists.",
             )
-    return UserRead.model_validate(
-        await crud.update_user(session, user, data.as_user_update())
-    )
+    return UserRead.model_validate(await crud.update_user(session, user, data.as_user_update()))
 
 
 @router.post("/me/password", response_model=TokenPair)

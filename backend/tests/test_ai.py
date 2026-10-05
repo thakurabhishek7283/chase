@@ -127,7 +127,10 @@ async def test_review_returns_a_validated_result() -> None:
 async def test_a_patch_naming_an_unknown_slot_is_discarded() -> None:
     # A hallucinated id would be a render error at finalize rather than a bad
     # bullet the author could reject. Dropping it salvages the rest.
-    payload = {**_REVIEW, "patches": [*_REVIEW["patches"], {**_REVIEW["patches"][0], "slot_id": "g42"}]}
+    payload = {
+        **_REVIEW,
+        "patches": [*_REVIEW["patches"], {**_REVIEW["patches"][0], "slot_id": "g42"}],
+    }
     agent = Agent(_fixed(payload), output_type=ResumeReviewResult)
 
     result = await review_resume(_parsed(), READABLE, JOB_DESCRIPTION, POSITION, agent=agent)

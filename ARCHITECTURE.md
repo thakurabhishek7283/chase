@@ -24,6 +24,7 @@
 13. [Design decisions & trade-offs](#13-design-decisions--trade-offs)
 14. [Known gaps](#14-known-gaps)
 15. [Extending the system](#15-extending-the-system)
+16. [Deployment & operations](#16-deployment--operations)
 
 ---
 
@@ -130,8 +131,12 @@ Jarvis/
 │       ├── companies/ jobs/        moderated shared data
 │       ├── resumes/                detail screen, score panel, review panel, patch cards
 │       └── matches/                "Companies to Chase"
-└── latex-worker/                   the LaTeX engine image + its HTTP server (§6.5) —
-                                     a peer service, not a backend subcomponent
+├── latex-worker/                   the LaTeX engine image + its HTTP server (§6.5) —
+│                                    a peer service, not a backend subcomponent
+├── docker-compose.yml              the whole stack behind one published port (§16)
+├── docker-compose.dev.yml          overlay: publishes services on 127.0.0.1 for native dev
+├── Makefile                        thin wrappers over the compose / uv / npm commands
+└── .github/workflows/              CI (lint, tests, builds) and multi-arch image releases
 ```
 
 **Layering rule:** `router → crud/services → models → database`. Routers
@@ -518,6 +523,10 @@ fetch-then-mutate CRUD app doesn't need a global store.
   API enforces every rule independently regardless of what the client renders.
 - The resume PDF download fetches a blob through `HttpClient` rather than a
   plain `<a href>`, since a bare link can't carry an `Authorization` header.
+- **The API is same-origin.** `API_BASE_URL` is the relative `/api/v1`: the
+  production image's nginx proxies it to the backend, and `npm start` does the
+  same through `proxy.conf.json`. No CORS preflight per request, and one build
+  serves any hostname.
 
 **One component renders the verdict everywhere.** `ScorePanel` and
 `ReviewPanel` both show a 0–100 score, summary, and keyword gaps through one
@@ -553,7 +562,14 @@ account B's data, parametrized across the whole resume surface rather than
 tested once, since the realistic failure mode is a new route that forgets the
 check.
 
-Frontend: `ng build` type-checks under `strict: true`.
+Frontend: `ng build` type-checks under `strict: true`; Prettier formatting
+is enforced.
+
+**CI** (`.github/workflows/ci.yml`) runs on every push and pull request:
+ruff lint + format check and the full backend suite with coverage — against
+pgvector Postgres and the real `latex-worker/server.py` running on the
+runner's TeX Live — the frontend format check, unit tests and production
+build, and Docker builds of all three images (layer-cached between runs).
 
 ---
 
@@ -564,7 +580,7 @@ Full annotated list in `backend/.env.example`; the essentials:
 | Variable | Default | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `postgresql+asyncpg://jarvis:…@localhost:5432/jarvis` | Must use the `asyncpg` driver |
-| `JWT_SECRET_KEY` | random per process | **Set this.** ≥32 bytes (RFC 7518 §3.2) or refused |
+| `JWT_SECRET_KEY` | random per process; in Docker, generated once into the data volume | ≥32 bytes (RFC 7518 §3.2) or refused. Set it explicitly for more than one instance |
 | `BOOTSTRAP_ADMIN_EMAIL` | – | Promoted to admin at registration |
 | `ATS_MODEL` | `gemini-3.5-flash` | The Gemini model the agents use — see §8 |
 | `GOOGLE_API_KEY` | – | **Set this.** Required before any upload or review works |
@@ -572,6 +588,11 @@ Full annotated list in `backend/.env.example`; the essentials:
 | `LATEX_DEFAULT_ENGINE` | `pdflatex` | Server default; per-resume overrides live in `resumes.latex_engine` |
 | `LATEX_WORKER_URL` | `http://localhost:8100` | Where the LaTeX worker service listens — `docker-compose.yml` points this at the `latex-worker` service; the default is correct for a standalone worker container in native development. See §6.5 |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCKOUT_SECONDS` | `10` / `900` | Credential-stuffing throttle, keyed per IP *and* per email |
+| `LOG_LEVEL` | `INFO` | Level for the `app.*` loggers |
+| `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Read by uvicorn: peers whose `X-Forwarded-For` is trusted to set the client address (and so the throttle key). Compose sets `*`, since only nginx can reach the backend there |
+| `WEB_CONCURRENCY` | `1` | Read by uvicorn: worker processes. See §16 before raising it |
+| `RUN_MIGRATIONS` | `true` | Container only: run `alembic upgrade head` on start |
+| `FASTEMBED_CACHE_PATH` | `/app/data/fastembed` in Docker | Where the embedding model is downloaded to on first use |
 | `JARVIS_TEST_DATABASE_URL` | – | Test-suite only |
 
 ---
@@ -628,3 +649,71 @@ route to the parametrized isolation test in `tests/test_auth.py`.
 (removes the manual TS type-parity cost in §10), password reset by email,
 moving upload/review off the request path into a background job, and per-user
 cost guardrails now that every request is attributable to an account.
+
+---
+
+## 16. Deployment & operations
+
+### Containers
+
+| Service | Image | Runs as | Health check | Published |
+|---|---|---|---|---|
+| `frontend` | nginx (unprivileged) + the Angular build | uid 101 | `GET /` | `APP_PORT` → 8080 |
+| `backend` | python slim + a uv-built venv | uid 10001 | `GET /api/v1/health` | – |
+| `latex-worker` | Debian + curated TeX Live | uid 10001, no capabilities | `GET /health` | – |
+| `postgres` | `pgvector/pgvector:pg18` | postgres | `pg_isready` | – |
+
+nginx is the only way in. It serves the SPA (with history-API fallback),
+proxies `/api`, `/docs` and `/openapi.json` to the backend, and **overwrites**
+`X-Forwarded-For` with its real peer — the backend runs uvicorn with
+`--proxy-headers` and trusts that header (`FORWARDED_ALLOW_IPS`), which is
+what makes the per-IP sign-in throttle meaningful behind a proxy. The
+application itself never reads `X-Forwarded-For`: when it did, a random
+header value per request was a fresh rate-limit budget per request.
+
+The backend entrypoint generates a JWT signing key into the `backend-data`
+volume if none is configured, runs `alembic upgrade head`, then `exec`s its
+command — so `docker compose exec backend python -m app.cli …` runs the
+admin CLI (§9) in the same environment as the server.
+
+### Probes
+
+- `GET /api/v1/health` — liveness. Touches nothing.
+- `GET /api/v1/health/ready` — readiness. Checks the database. The LLM key and
+  the LaTeX worker are deliberately not part of it: each has its own 503 at
+  the routes that need it, and neither stops the rest of the API.
+
+### State
+
+| Volume | Holds | Back up? |
+|---|---|---|
+| `pgdata` | every account, resume, review and vector | **Yes** |
+| `backend-data` | the generated JWT key, the embedding model cache, LaTeX failure dumps (contain resume text) | The key, if you rely on the generated one |
+
+### Images
+
+`.github/workflows/release.yml` publishes `chase-backend`, `chase-frontend` and
+`chase-latex-worker` to `ghcr.io/<owner>/` on every push to `main` (`:latest`,
+`:sha-…`) and on `v*.*.*` tags (`:1.2.3`, `:1.2`), for amd64 and arm64. Each
+architecture builds on a native runner; TeX Live under QEMU takes hours.
+`docker-compose.yml` names these images *and* keeps `build:` contexts, so the
+same file serves `docker compose pull` and `docker compose up --build`.
+
+A new GHCR package is private by default. To let others pull without a
+login, set each package's visibility to public under the repository's
+**Packages** settings once after the first release.
+
+### Scaling past one process
+
+The stack is sized for one backend process, and two pieces of state are
+per-process today:
+
+- **The sign-in limiter** is in memory, so *N* workers or replicas tolerate
+  roughly *N×* the configured attempts. A shared store (Redis) is the fix.
+- **Migrations** run on every container start. With several replicas, set
+  `RUN_MIGRATIONS=false` and run `alembic upgrade head` once per release.
+
+Uploads and reviews are synchronous LLM calls that can take minutes while a
+Gemini rate limit is waited out — nginx allows 300 s — so moving them to a
+background job queue (§15) matters before more traffic does.
+

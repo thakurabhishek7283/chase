@@ -16,19 +16,18 @@ from app.models.user import User
 
 
 def client_ip(request: Request | None) -> str | None:
-    """Best-effort caller address.
+    """The caller's address, as seen by the socket — never a request header.
 
-    `X-Forwarded-For` is honoured because this app is expected to sit behind a
-    reverse proxy, where `request.client` is the proxy and therefore useless.
-    It is also trivially spoofable when *not* behind one — which is why it
-    lands in an audit note and never in an authorization decision.
+    This feeds the sign-in and registration rate limiters, so it must not be
+    something the caller can choose: reading `X-Forwarded-For` here directly
+    would let anyone mint a fresh limiter key per request by sending a random
+    value. Behind a reverse proxy, uvicorn's `--proxy-headers` rewrites
+    `request.client` from that header — but only for peers listed in
+    `FORWARDED_ALLOW_IPS`, which is the one place that trust is decided.
     """
-    if request is None:
+    if request is None or request.client is None:
         return None
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()[:45]
-    return request.client.host[:45] if request.client else None
+    return request.client.host[:45]
 
 
 async def record(

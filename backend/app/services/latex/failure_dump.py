@@ -20,11 +20,10 @@ import json
 import logging
 import traceback
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.ai.schemas import ResumeTailoring
-from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -56,14 +55,14 @@ def dump_failure(
     diagnostic path) and logs a warning in that case.
     """
     try:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%f")
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S_%f")
         slug = f"{context}_{stamp}"
         out = _dump_dir() / slug
         out.mkdir(parents=True, exist_ok=True)
 
         # meta.json --------------------------------------------------------
         meta = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "context": context,
             "resume_id": str(resume_id) if resume_id else None,
             "user_id": str(user_id) if user_id else None,
@@ -76,15 +75,11 @@ def dump_failure(
 
         # error.txt --------------------------------------------------------
         tb = traceback.format_exc()
-        (out / "error.txt").write_text(
-            f"{type(error).__name__}: {error}\n\n{tb}", encoding="utf-8"
-        )
+        (out / "error.txt").write_text(f"{type(error).__name__}: {error}\n\n{tb}", encoding="utf-8")
 
         # patch.json -------------------------------------------------------
         if tailoring is not None:
-            (out / "patch.json").write_text(
-                tailoring.model_dump_json(indent=2), encoding="utf-8"
-            )
+            (out / "patch.json").write_text(tailoring.model_dump_json(indent=2), encoding="utf-8")
 
         # source.tex -------------------------------------------------------
         if source_tex is not None:
@@ -98,8 +93,6 @@ def dump_failure(
         )
         return out
 
-    except Exception as dump_exc:  # noqa: BLE001
-        logger.warning(
-            "[failure_dump] Could not write artefacts: %s", dump_exc, exc_info=True
-        )
+    except Exception as dump_exc:
+        logger.warning("[failure_dump] Could not write artefacts: %s", dump_exc, exc_info=True)
         return None

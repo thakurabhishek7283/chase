@@ -2,8 +2,8 @@
 
 @if (!isEdit()) {
   <p class="lede">
-    Companies are shared by everyone here. New submissions are reviewed by an administrator —
-    yours is usable straight away while it waits.
+    Companies are shared by everyone here. New submissions are reviewed by an administrator — yours
+    is usable straight away while it waits.
   </p>
 }
 
@@ -14,7 +14,9 @@
 @if (existing(); as match) {
   <p class="duplicate">
     <strong>{{ match.name }}</strong> is already listed
-    @if (match.status !== 'approved') { ({{ match.status }}) }
+    @if (match.status !== 'approved') {
+      ({{ match.status }})
+    }
     — use it instead of adding a duplicate.
     <a [routerLink]="['/jobs/new']">Add a job for it</a>
   </p>

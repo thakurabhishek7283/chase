@@ -1,59 +1,52 @@
 # Frontend
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.1.2.
+The Angular single-page app for Chase —
+standalone components, state in signals. See the root [README](../README.md)
+for running the whole stack and [ARCHITECTURE.md §10](../ARCHITECTURE.md#10-frontend-design)
+for how it is put together.
 
-## Development server
+## Development
 
-To start a local development server, run:
-
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+Requires Node.js 24 (or ≥ 22.22) and a backend on `localhost:8000`
+(`make dev-infra` and `make backend-dev` from the repository root).
 
 ```bash
-ng generate component component-name
+npm ci
+npm start          # http://localhost:4200, reloads on save
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+The app calls the API on its own origin (`/api/v1`). `npm start` forwards
+`/api`, `/docs` and `/openapi.json` to the backend through
+[`proxy.conf.json`](proxy.conf.json); the Docker image's nginx does the same
+in production.
 
-```bash
-ng generate --help
+## Scripts
+
+| Command | What |
+|---|---|
+| `npm start` | Dev server with live reload |
+| `npm run build` | Production bundle in `dist/frontend/browser` |
+| `npm run test:ci` | Unit tests once (Vitest); `npm test` watches |
+| `npm run format` / `format:check` | Prettier write / verify |
+
+## Layout
+
+```
+src/app/
+├── core/        models, typed HTTP services, auth interceptor + guards
+├── auth/        sign-in and registration
+├── layout/      dashboard shell (sidebar navigation)
+├── resumes/     upload, detail, score panel, review panel, patch cards
+├── jobs/        job profiles (moderated, shared)
+├── companies/   companies (moderated, shared)
+├── matches/     "Companies to Chase" — semantic matches
+├── profile/     self-service account settings
+├── admin/       moderation queue
+└── users/       user management (admin)
 ```
 
-## Building
+## Container image
 
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+[`Dockerfile`](Dockerfile) builds the production bundle and serves it with
+unprivileged nginx on port 8080 ([`nginx/default.conf.template`](nginx/default.conf.template)).
+`BACKEND_URL` (default `http://backend:8000`) sets where `/api` is proxied.

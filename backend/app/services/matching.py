@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
@@ -69,7 +69,7 @@ async def upsert_embedding(
         return existing
 
     vector = await provider.embed_one(source_text)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if existing is None:
         existing = EntityEmbedding(

@@ -23,6 +23,7 @@ was rebuilt to stop.
 """
 
 from dataclasses import dataclass
+from itertools import pairwise
 
 from app.ai.intake import Correction, LatexIntake, read_upload
 from app.ai.slot_schema import preamble_end
@@ -57,7 +58,9 @@ class IntakeError(ValueError):
     "fix the vocabulary" or "widen what the parser understands".
     """
 
-    def __init__(self, message: str, *, code: LatexErrorCode = LatexErrorCode.UNSUPPORTED_LATEX) -> None:
+    def __init__(
+        self, message: str, *, code: LatexErrorCode = LatexErrorCode.UNSUPPORTED_LATEX
+    ) -> None:
         super().__init__(message)
         self.code = code
 
@@ -115,7 +118,7 @@ def apply_corrections(source: str, corrections: list[Correction]) -> str:
         edits.append((start, start + len(correction.find), correction))
 
     edits.sort(key=lambda edit: edit[0])
-    for (_, previous_end, earlier), (next_start, _, later) in zip(edits, edits[1:]):
+    for (_, previous_end, earlier), (next_start, _, later) in pairwise(edits):
         if next_start < previous_end:
             raise IntakeError(
                 f"Two corrections overlap the same text, so neither can be applied safely: "
