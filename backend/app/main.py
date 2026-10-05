@@ -1,11 +1,11 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from importlib.metadata import PackageNotFoundError, version
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import __version__
 from app.core.config import get_settings
 from app.core.db import engine
 from app.routers import (
@@ -30,11 +30,6 @@ logging.basicConfig(
     level=settings.log_level.upper(),
     format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
 )
-
-try:
-    __version__ = version("jarvis-backend")
-except PackageNotFoundError:  # running from a source tree that was never installed
-    __version__ = "0.0.0"
 
 
 @asynccontextmanager
