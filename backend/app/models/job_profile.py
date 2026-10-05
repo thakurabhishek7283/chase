@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import CheckConstraint, DateTime, Index, text
 from sqlmodel import Field, SQLModel
@@ -8,7 +8,7 @@ from app.models.moderation import status_check, status_constraint_name
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class JobProfile(SQLModel, table=True):

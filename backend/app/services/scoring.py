@@ -17,7 +17,7 @@ either document is a database read.
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import col, desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -88,7 +88,7 @@ async def record(
     write, which is how `services/review.create_review` folds a review's score
     into the cache without a second commit.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     existing = await score_for(session, resume.id, job_profile_id)
 
     if existing is None:

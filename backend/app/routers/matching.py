@@ -30,7 +30,9 @@ async def reindex_embeddings(session: SessionDep, admin: AdminUser) -> ReindexSu
     try:
         provider = get_embedding_provider()
     except EmbeddingError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
 
     # Only approved postings are indexed. A pending submission is visible to
     # its contributor alone, so embedding it would surface an unreviewed row in
@@ -62,7 +64,9 @@ async def reindex_embeddings(session: SessionDep, admin: AdminUser) -> ReindexSu
             )
             indexed_users += 1
     except (EmbeddingError, matching.VectorSearchUnavailableError) as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
 
     return ReindexSummary(job_profiles_indexed=len(jobs), users_indexed=indexed_users)
 
@@ -86,9 +90,7 @@ async def job_matches(
     leave their job.
     """
     if user_id != current.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     user = current
     if not user.career_goals:
         raise HTTPException(
@@ -96,19 +98,22 @@ async def job_matches(
             detail="This user has no career goals set, so there is nothing to match against.",
         )
 
-    settings = get_settings()
     try:
         provider = get_embedding_provider()
         query_vector = await provider.embed_one(user.career_goals)
     except EmbeddingError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
 
     try:
         hits = await matching.find_similar(
             session, query_vector, entity_type="job_profile", limit=limit
         )
     except matching.VectorSearchUnavailableError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
 
     if not hits:
         return []

@@ -109,14 +109,10 @@ ModeratorUser = Annotated[User, Depends(get_current_moderator)]
 def require_self_or_admin(target_user_id: uuid.UUID, user: User) -> None:
     """Guard endpoints addressed by a user id in the path."""
     if user.id != target_user_id and not user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 
-async def require_owned_resume(
-    session: AsyncSession, resume_id: uuid.UUID, user: User
-) -> Resume:
+async def require_owned_resume(session: AsyncSession, resume_id: uuid.UUID, user: User) -> Resume:
     """Load a resume the caller owns. There is no role that bypasses this.
 
     Not even admins — deliberately, and this is the one authorization rule in
@@ -175,9 +171,7 @@ async def require_visible_job_profile(
 ) -> JobProfile:
     job = await session.get(JobProfile, job_profile_id)
     if job is None or not is_visible(job, user):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Job profile not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job profile not found")
     return job
 
 

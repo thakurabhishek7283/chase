@@ -46,8 +46,10 @@ class LatexCompileError(RuntimeError):
 
 
 def _resolve(engine: str | None) -> str:
-    return validate_engine(engine) if engine is not None else validate_engine(
-        get_settings().latex_default_engine
+    return (
+        validate_engine(engine)
+        if engine is not None
+        else validate_engine(get_settings().latex_default_engine)
     )
 
 

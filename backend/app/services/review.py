@@ -20,7 +20,7 @@ be hung off the *root* master rather than off whatever was reviewed.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func
 from sqlmodel import col, select
@@ -41,7 +41,7 @@ class ReviewIncomplete(RuntimeError):
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _clean(text: str) -> str:

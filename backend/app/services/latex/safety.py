@@ -23,12 +23,36 @@ import re
 #: Inline commands a resume bullet has a real reason to use.
 ALLOWED_COMMANDS = frozenset(
     {
-        "textbf", "textit", "textsc", "texttt", "textrm", "textsf", "emph",
-        "underline", "uline", "textsuperscript", "textsubscript",
-        "href", "url", "texorpdfstring",
-        "LaTeX", "TeX", "ldots", "dots", "textbar", "textbackslash",
-        "times", "textendash", "textemdash", "textquotesingle", "degree",
-        "small", "footnotesize", "normalsize", "bfseries", "itshape",
+        "textbf",
+        "textit",
+        "textsc",
+        "texttt",
+        "textrm",
+        "textsf",
+        "emph",
+        "underline",
+        "uline",
+        "textsuperscript",
+        "textsubscript",
+        "href",
+        "url",
+        "texorpdfstring",
+        "LaTeX",
+        "TeX",
+        "ldots",
+        "dots",
+        "textbar",
+        "textbackslash",
+        "times",
+        "textendash",
+        "textemdash",
+        "textquotesingle",
+        "degree",
+        "small",
+        "footnotesize",
+        "normalsize",
+        "bfseries",
+        "itshape",
     }
 )
 
@@ -110,9 +134,7 @@ def validate_fragment(fragment: str) -> str:
     if not fragment.strip():
         raise UnsafeLatexError("Fragment is empty.")
     if "%" in re.sub(r"\\%", "", fragment):
-        raise UnsafeLatexError(
-            "Unescaped '%' would comment out the rest of the line; write '\\%'."
-        )
+        raise UnsafeLatexError("Unescaped '%' would comment out the rest of the line; write '\\%'.")
     if _FORBIDDEN.search(fragment):
         raise UnsafeLatexError("Fragment uses a structural or file-access command.")
     if not braces_balanced(fragment):

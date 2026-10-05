@@ -89,7 +89,9 @@ class Correction(BaseModel):
         )
     )
     replace: str = Field(description="What to put there instead.")
-    reason: str = Field(description="One sentence: what would have gone wrong, and why this fixes it.")
+    reason: str = Field(
+        description="One sentence: what would have gone wrong, and why this fixes it."
+    )
 
 
 class LatexIntake(BaseModel):

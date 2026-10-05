@@ -12,7 +12,7 @@ they are audited by is decoration. Read it with psql.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Uuid
@@ -31,7 +31,7 @@ AUDIT_ACTIONS: tuple[str, ...] = (
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class AuditLog(SQLModel, table=True):

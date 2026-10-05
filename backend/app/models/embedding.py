@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import CheckConstraint, Column, DateTime, UniqueConstraint
@@ -9,7 +9,7 @@ from app.core.config import get_settings
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 #: Entity kinds that can carry an embedding. Kept as a CHECK-constrained string

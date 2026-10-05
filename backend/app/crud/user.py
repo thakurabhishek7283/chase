@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlmodel import SQLModel, col, func, select
@@ -29,9 +29,7 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     return result.first()
 
 
-async def create_user(
-    session: AsyncSession, data: UserCreate, *, role: str | None = None
-) -> User:
+async def create_user(session: AsyncSession, data: UserCreate, *, role: str | None = None) -> User:
     """Create an account, resolving its role from configuration if not given."""
     email = normalize_email(data.email)
     payload = data.model_dump(exclude={"password", "email", "role"})
@@ -81,7 +79,7 @@ async def update_user(session: AsyncSession, user: User, data: UserUpdate) -> Us
         fields["email"] = normalize_email(fields["email"])
     for field, value in fields.items():
         setattr(user, field, value)
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await session.commit()
     await session.refresh(user)
@@ -96,7 +94,7 @@ async def set_password(session: AsyncSession, user: User, new_password: str) -> 
     """
     user.hashed_password = hash_password(new_password)
     user.token_version += 1
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await session.commit()
     await session.refresh(user)
@@ -105,7 +103,7 @@ async def set_password(session: AsyncSession, user: User, new_password: str) -> 
 
 async def set_role(session: AsyncSession, user: User, role: str) -> User:
     user.role = role
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await session.commit()
     await session.refresh(user)
@@ -118,7 +116,7 @@ async def set_active(session: AsyncSession, user: User, is_active: bool) -> User
     # until its refresh token happens to expire.
     if not is_active:
         user.token_version += 1
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await session.commit()
     await session.refresh(user)
@@ -146,9 +144,7 @@ _BLOCKING_REFERENCES: tuple[tuple[str, type[SQLModel], Any], ...] = (
 )
 
 
-async def count_blocking_references(
-    session: AsyncSession, user_id: uuid.UUID
-) -> dict[str, int]:
+async def count_blocking_references(session: AsyncSession, user_id: uuid.UUID) -> dict[str, int]:
     """Count the rows that would make `delete_user` fail, keyed by label.
 
     An empty mapping means the account can be hard-deleted. Anything else is

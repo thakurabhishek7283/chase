@@ -179,9 +179,13 @@ async def review(user_client: AsyncClient) -> dict:
 async def test_upload_is_the_only_way_content_enters(user_client: AsyncClient) -> None:
     # There is no JSON create and no content update. Every previous way in was a
     # way to store a document nobody had proved was renderable.
-    assert (await user_client.post("/api/v1/resumes", json={"title": "x", "content": "y"})).status_code == 405
+    assert (
+        await user_client.post("/api/v1/resumes", json={"title": "x", "content": "y"})
+    ).status_code == 405
     resume_id = await _upload(user_client)
-    assert (await user_client.patch(f"/api/v1/resumes/{resume_id}", json={"title": "z"})).status_code == 405
+    assert (
+        await user_client.patch(f"/api/v1/resumes/{resume_id}", json={"title": "z"})
+    ).status_code == 405
 
 
 async def test_upload_refuses_anything_that_is_not_a_tex_file(user_client: AsyncClient) -> None:
@@ -303,9 +307,7 @@ async def test_a_tailored_version_can_be_reviewed_again(
 
     # And it shows up on the version's own history, not the master's.
     on_child = await user_client.get(f"/api/v1/resumes/{child_id}/reviews")
-    on_master = await user_client.get(
-        f"/api/v1/resumes/{review['source_resume_id']}/reviews"
-    )
+    on_master = await user_client.get(f"/api/v1/resumes/{review['source_resume_id']}/reviews")
     assert [row["id"] for row in on_child.json()] == [second.json()["id"]]
     assert [row["id"] for row in on_master.json()] == [review["id"]]
 
@@ -339,7 +341,6 @@ async def test_improving_a_version_produces_a_sibling_not_a_grandchild(
     # or the version list is two identical lines.
     labels = {v["version_label"] for v in versions.json()}
     assert labels == {"Tailored for Backend Engineer", "Tailored for Backend Engineer v2"}
-
 
     # Siblings rather than grandchildren is also what keeps `crud.delete_resume`
     # correct: it reaches exactly one generation down.
@@ -402,9 +403,7 @@ async def test_feedback_revises_only_that_patch(user_client: AsyncClient, review
     assert sibling["revision_count"] == 0
 
 
-async def test_revert_restores_the_first_proposal(
-    user_client: AsyncClient, review: dict
-) -> None:
+async def test_revert_restores_the_first_proposal(user_client: AsyncClient, review: dict) -> None:
     patch = review["patches"][0]
     await user_client.post(
         f"/api/v1/reviews/{review['id']}/patches/{patch['id']}/feedback",
@@ -531,9 +530,7 @@ async def test_a_master_that_changed_under_the_review_refuses_to_finalize(
 
     async with session_maker() as session:
         master = (
-            await session.exec(
-                select(Resume).where(Resume.id == review["source_resume_id"])
-            )
+            await session.exec(select(Resume).where(Resume.id == review["source_resume_id"]))
         ).one()
         master.content = MASTER.replace(
             "Ran the on-call rotation.", "Ran the on-call rotation for six teams."
@@ -564,9 +561,7 @@ async def test_another_users_review_does_not_exist(
     assert (
         await other_client.post(f"/api/v1/reviews/{review_id}/finalize", json={})
     ).status_code == 404
-    assert (
-        await other_client.get(f"/api/v1/reviews/{review_id}/preview")
-    ).status_code == 404
+    assert (await other_client.get(f"/api/v1/reviews/{review_id}/preview")).status_code == 404
 
 
 async def test_deleting_a_master_takes_its_reviews_and_children(

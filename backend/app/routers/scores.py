@@ -90,9 +90,7 @@ async def score_against_job(
     # deployment with no model configured at all.
     require_llm_key()
     result = await score_resume(readable_text(resume), job.description, job.position_title)
-    stored = await scoring.record(
-        session, resume=resume, job_profile_id=job.id, result=result
-    )
+    stored = await scoring.record(session, resume=resume, job_profile_id=job.id, result=result)
     return _out(stored, resume, computed=True)
 
 

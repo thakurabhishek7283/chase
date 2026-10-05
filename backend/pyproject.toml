@@ -1,7 +1,8 @@
 [project]
 name = "jarvis-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "FastAPI backend for the AI-centric interview tracker and LaTeX resume optimizer"
+readme = "../README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.5",
@@ -32,9 +33,55 @@ local-embeddings = [
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.0",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
+addopts = "-ra"
+testpaths = ["tests"]
+filterwarnings = [
+    # Starlette renamed the 422 constant; FastAPI's own internals still use the
+    # old one. Our code does not — see app/routers.
+    "ignore:'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated:DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "B",       # bugbear
+    "UP",      # pyupgrade
+    "ASYNC",   # blocking calls inside async code
+    "S",       # bandit (security)
+    "SIM",     # simplifications
+    "RUF",
+]
+ignore = [
+    "E501",    # the formatter owns line length; long strings and URLs are fine
+    "B008",    # FastAPI's Depends()/Query() defaults are the idiom
+    "SIM108",  # a ternary is not always clearer than an if/else
+    "UP042",   # (str, Enum) -> StrEnum changes str() output; not worth the risk
+    "UP047",   # TypeVar generics read fine; PEP 695 syntax is optional
+    "RUF001", "RUF002", "RUF003",  # typographic dashes and quotes in prose are deliberate
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S311"]  # asserts and fixture passwords
+"app/cli.py" = ["T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]

@@ -81,7 +81,7 @@ class EmailChangeRequest(BaseModel):
 class TokenPair(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105 — the OAuth2 scheme name, not a secret
     expires_in: int
 
 

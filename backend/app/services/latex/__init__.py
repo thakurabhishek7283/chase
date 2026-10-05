@@ -7,6 +7,13 @@ from app.services.latex.compiler import (
     engine_available,
     engine_version,
 )
+from app.services.latex.config import (
+    BulletMacro,
+    FieldMacro,
+    ListPair,
+    SlotConfig,
+    SlotConfigError,
+)
 from app.services.latex.engines import (
     ENGINE_NAMES,
     EngineName,
@@ -16,13 +23,6 @@ from app.services.latex.engines import (
     validate_engine,
 )
 from app.services.latex.errors import LatexErrorCode
-from app.services.latex.config import (
-    BulletMacro,
-    FieldMacro,
-    ListPair,
-    SlotConfig,
-    SlotConfigError,
-)
 from app.services.latex.fingerprint import (
     document_fingerprint,
     slot_hash,
@@ -62,13 +62,13 @@ __all__ = [
     "FieldMacro",
     "GroupEdit",
     "ItemGroup",
-    "ListPair",
     "LatexCompileError",
     "LatexEngineNotFoundError",
     "LatexErrorCode",
     "LatexParseError",
     "LatexRenderError",
     "LatexResume",
+    "ListPair",
     "MarkedRegion",
     "RegionEdit",
     "Section",
@@ -93,5 +93,6 @@ __all__ = [
     "slot_hashes",
     "template_hash",
     "to_markdown",
+    "validate_engine",
     "validate_fragment",
 ]

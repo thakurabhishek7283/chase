@@ -21,6 +21,7 @@ because this is the only place an edit ever reaches the document:
 """
 
 from dataclasses import dataclass
+from itertools import pairwise
 
 from app.services.latex.fingerprint import template_hash
 from app.services.latex.model import ItemGroup, LatexResume, Span
@@ -138,7 +139,8 @@ def render(
         replacements.append((region.span, coerce_fragment(edit.latex)))
 
     replacements.sort(key=lambda item: item[0].start, reverse=True)
-    for earlier, later in zip(replacements[1:], replacements):
+    # Sorted descending, so each pair is (later in the document, earlier).
+    for later, earlier in pairwise(replacements):
         if earlier[0].overlaps(later[0]):
             raise LatexRenderError("Two edits target overlapping regions of the document.")
 

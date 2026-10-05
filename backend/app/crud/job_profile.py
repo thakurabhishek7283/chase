@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func
 from sqlalchemy.sql.elements import ColumnElement
@@ -15,7 +15,7 @@ async def create_job_profile(
     session: AsyncSession, data: JobProfileCreate, *, author: User
 ) -> JobProfile:
     approved = author.is_admin
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job_profile = JobProfile(
         **data.model_dump(),
         created_by=author.id,
@@ -112,7 +112,7 @@ async def update_job_profile(
 ) -> JobProfile:
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(job_profile, field, value)
-    job_profile.updated_at = datetime.now(timezone.utc)
+    job_profile.updated_at = datetime.now(UTC)
     session.add(job_profile)
     await session.commit()
     await session.refresh(job_profile)
@@ -129,7 +129,7 @@ async def set_moderation_status(
 ) -> JobProfile:
     job_profile.status = status
     job_profile.reviewed_by = reviewer.id
-    job_profile.reviewed_at = datetime.now(timezone.utc)
+    job_profile.reviewed_at = datetime.now(UTC)
     job_profile.rejection_reason = reason
     job_profile.updated_at = job_profile.reviewed_at
     session.add(job_profile)

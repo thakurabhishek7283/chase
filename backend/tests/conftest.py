@@ -31,9 +31,7 @@ os.environ.pop("GOOGLE_API_KEY", None)
 
 #: Pinned so token signing is deterministic within a run and the "no secret
 #: configured" warning stays out of the test output.
-os.environ.setdefault(
-    "JWT_SECRET_KEY", "test-only-signing-key-padded-to-the-32-byte-minimum"
-)
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-signing-key-padded-to-the-32-byte-minimum")
 #: Whoever registers with this address is promoted to admin — the same
 #: bootstrap path an operator uses, exercised rather than bypassed.
 ADMIN_EMAIL = "admin@example.com"

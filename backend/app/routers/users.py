@@ -122,11 +122,7 @@ async def update_active(
     user = await crud.get_user(session, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if (
-        not data.is_active
-        and user.role == "admin"
-        and await crud.count_admins(session) <= 1
-    ):
+    if not data.is_active and user.role == "admin" and await crud.count_admins(session) <= 1:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This is the only active administrator and cannot be deactivated.",

@@ -1,11 +1,8 @@
 import pytest
-from pydantic_ai import Agent
-from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
-from pydantic_ai.models.function import AgentInfo, FunctionModel
 
+from app.ai.review import REVIEW_SYSTEM_PROMPT, build_outline
 from app.ai.schemas import ResumeTailoring, TailoredGroup, TailoredRegion
 from app.ai.slot_schema import ProposedBulletMacro, ProposedFieldMacro, SlotSchema
-from app.ai.review import REVIEW_SYSTEM_PROMPT, build_outline
 from app.services.latex import (
     BulletMacro,
     FieldMacro,
@@ -26,12 +23,17 @@ from app.services.latex import (
     to_markdown,
 )
 from app.services.latex.fingerprint import frozen_chunks
+from app.services.latex.safety import (
+    braces_balanced,
+    coerce_fragment,
+    escape_text,
+    validate_fragment,
+)
 from app.services.slot_discovery import (
     SlotDiscoveryError,
     check_invariants,
     to_slot_config,
 )
-from app.services.latex.safety import braces_balanced, coerce_fragment, escape_text, validate_fragment
 from app.services.tailoring import apply_tailoring
 
 #: Every `parse()` in this file goes through the built-in shapes; the
@@ -93,7 +95,10 @@ def test_parse_finds_bullets_and_marked_regions() -> None:
     resume = _parsed()
 
     assert [s.heading for s in resume.sections] == [
-        "Header", "Skills", "Experience", "Education",
+        "Header",
+        "Skills",
+        "Experience",
+        "Education",
     ]
     assert len(resume.groups) == 1
     assert resume.bullet_count == 3
@@ -261,9 +266,7 @@ def test_group_hash_changes_when_its_bullets_are_reordered() -> None:
     resume = _parsed()
     reordered = render(
         resume,
-        group_edits=[
-            GroupEdit("g1", [b.latex for b in reversed(resume.groups[0].bullets)])
-        ],
+        group_edits=[GroupEdit("g1", [b.latex for b in reversed(resume.groups[0].bullets)])],
     )
     assert parse(reordered, SECTION_MACROS).groups[0].content_hash != resume.groups[0].content_hash
 

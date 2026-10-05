@@ -21,9 +21,7 @@ EngineName = Literal["latexmk", "pdflatex", "xelatex", "lualatex"]
 
 #: The only names accepted from a request. Widening this means widening the
 #: `ck_resumes_latex_engine` CHECK constraint in a migration too.
-ENGINE_NAMES: frozenset[str] = frozenset(
-    {"latexmk", "pdflatex", "xelatex", "lualatex"}
-)
+ENGINE_NAMES: frozenset[str] = frozenset({"latexmk", "pdflatex", "xelatex", "lualatex"})
 
 #: Engines built on a Unicode TeX — handle `fontspec` and friends natively.
 UNICODE_ENGINES: frozenset[str] = frozenset({"xelatex", "lualatex"})
@@ -34,8 +32,14 @@ XETEX_ENGINES: frozenset[str] = frozenset({"xelatex"})
 
 #: Packages that simply do not work under pdfLaTeX.
 _UNICODE_ONLY_PACKAGES = {
-    "fontspec", "unicode-math", "polyglossia", "xecjk", "xltxtra", "xunicode",
-    "mathspec", "luatextra",
+    "fontspec",
+    "unicode-math",
+    "polyglossia",
+    "xecjk",
+    "xltxtra",
+    "xunicode",
+    "mathspec",
+    "luatextra",
 }
 #: Markers that pin the document to LuaLaTeX specifically.
 _LUA_ONLY_PACKAGES = {"luacode", "luatexbase", "lualatex-math", "luaotfload"}
@@ -44,8 +48,14 @@ _LUA_ONLY_COMMANDS = re.compile(r"\\directlua\b|\\luaexec\b")
 #: Primitives pdfTeX provides and XeTeX does not. Under XeTeX these are not
 #: degraded output, they are `Undefined control sequence` — the engine stops.
 _PDFTEX_ONLY_PRIMITIVES = {
-    "pdfgentounicode", "pdfglyphtounicode", "pdfximage", "pdfrefximage",
-    "pdfpageattr", "pdfpagesattr", "pdfinfo", "pdfcompresslevel",
+    "pdfgentounicode",
+    "pdfglyphtounicode",
+    "pdfximage",
+    "pdfrefximage",
+    "pdfpageattr",
+    "pdfpagesattr",
+    "pdfinfo",
+    "pdfcompresslevel",
 }
 #: Files whose *contents* are pdfTeX-only, mapped to the primitive that proves
 #: the engine can read them. `glyphtounicode.tex` ships with every distribution

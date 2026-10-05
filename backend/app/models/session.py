@@ -14,14 +14,14 @@ the whole family is revoked and both are forced to sign in again.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, Uuid
 from sqlmodel import Column, Field, SQLModel
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class RefreshToken(SQLModel, table=True):
@@ -65,5 +65,5 @@ class RefreshToken(SQLModel, table=True):
             return False
         expires = self.expires_at
         if expires.tzinfo is None:  # a naive value read back from Postgres
-            expires = expires.replace(tzinfo=timezone.utc)
-        return expires > datetime.now(timezone.utc)
+            expires = expires.replace(tzinfo=UTC)
+        return expires > datetime.now(UTC)

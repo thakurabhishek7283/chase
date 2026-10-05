@@ -160,7 +160,13 @@ def build_template_prompt(source: str, cutoff: int, limit: int) -> str:
         for line in preamble.splitlines()
         if any(
             token in line
-            for token in ("newcommand", "renewcommand", "def\\", "DeclareRobustCommand", "newenvironment")
+            for token in (
+                "newcommand",
+                "renewcommand",
+                "def\\",
+                "DeclareRobustCommand",
+                "newenvironment",
+            )
         )
     ]
     definition_text = "\n".join(definitions)[:limit] or "(no macro definitions in the preamble)"

@@ -38,11 +38,37 @@ from typing import Any
 #: have — so this is refused wherever a config comes from.
 _STRUCTURAL_MACROS = frozenset(
     {
-        "documentclass", "usepackage", "begin", "end", "item", "newcommand",
-        "renewcommand", "providecommand", "def", "let", "input", "include",
-        "section", "subsection", "subsubsection", "chapter", "part", "paragraph",
-        "write18", "immediate", "csname", "expandafter", "catcode", "newpage",
-        "clearpage", "special", "directlua", "write", "openout", "openin", "read",
+        "documentclass",
+        "usepackage",
+        "begin",
+        "end",
+        "item",
+        "newcommand",
+        "renewcommand",
+        "providecommand",
+        "def",
+        "let",
+        "input",
+        "include",
+        "section",
+        "subsection",
+        "subsubsection",
+        "chapter",
+        "part",
+        "paragraph",
+        "write18",
+        "immediate",
+        "csname",
+        "expandafter",
+        "catcode",
+        "newpage",
+        "clearpage",
+        "special",
+        "directlua",
+        "write",
+        "openout",
+        "openin",
+        "read",
     }
 )
 
@@ -51,10 +77,34 @@ _STRUCTURAL_MACROS = frozenset(
 #: and nest slots inside each other.
 _FORMATTING_MACROS = frozenset(
     {
-        "textbf", "textit", "textsc", "texttt", "textrm", "textsf", "emph",
-        "underline", "uline", "href", "url", "small", "footnotesize", "normalsize",
-        "large", "Large", "LARGE", "huge", "Huge", "mbox", "text", "hfill",
-        "vspace", "hspace", "textsuperscript", "textsubscript", "color", "textcolor",
+        "textbf",
+        "textit",
+        "textsc",
+        "texttt",
+        "textrm",
+        "textsf",
+        "emph",
+        "underline",
+        "uline",
+        "href",
+        "url",
+        "small",
+        "footnotesize",
+        "normalsize",
+        "large",
+        "Large",
+        "LARGE",
+        "huge",
+        "Huge",
+        "mbox",
+        "text",
+        "hfill",
+        "vspace",
+        "hspace",
+        "textsuperscript",
+        "textsubscript",
+        "color",
+        "textcolor",
     }
 )
 
@@ -217,13 +267,16 @@ class SlotConfig:
         # Section macros only *locate* headings — nothing is ever spliced into
         # one — so `\section` itself is legal here even though the structural
         # ban rejects it as a content slot. Format is all that needs checking.
-        sections = tuple(
-            dict.fromkeys(
-                name.strip().lstrip("\\")
-                for name in self.section_macros
-                if _MACRO_NAME.match(name.strip().lstrip("\\"))
+        sections = (
+            tuple(
+                dict.fromkeys(
+                    name.strip().lstrip("\\")
+                    for name in self.section_macros
+                    if _MACRO_NAME.match(name.strip().lstrip("\\"))
+                )
             )
-        ) or DEFAULT_SECTION_MACROS
+            or DEFAULT_SECTION_MACROS
+        )
 
         environments = tuple(
             dict.fromkeys(

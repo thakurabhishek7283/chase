@@ -29,9 +29,7 @@ async def list_resume_versions(
     session: AsyncSession, master_resume_id: uuid.UUID, *, user_id: uuid.UUID
 ) -> list[Resume]:
     result = await session.exec(
-        select(Resume).where(
-            Resume.master_resume_id == master_resume_id, Resume.user_id == user_id
-        )
+        select(Resume).where(Resume.master_resume_id == master_resume_id, Resume.user_id == user_id)
     )
     return list(result.all())
 

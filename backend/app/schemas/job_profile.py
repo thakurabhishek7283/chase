@@ -5,9 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
-ExperienceTier = Literal[
-    "intern", "junior", "mid", "senior", "staff", "principal", "executive"
-]
+ExperienceTier = Literal["intern", "junior", "mid", "senior", "staff", "principal", "executive"]
 ModerationStatus = Literal["pending", "approved", "rejected"]
 
 _HAS_LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
