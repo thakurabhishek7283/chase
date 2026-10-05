@@ -1,0 +1,17 @@
+# Normalise line endings in the repository. Shell scripts in particular must
+# stay LF: a Windows checkout with CRLF turns `#!/bin/sh` into `/bin/sh\r`, and
+# the backend container then fails to start with "no such file or directory".
+* text=auto eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.woff2 binary
+
+# Generated lockfiles: collapse them in diffs.
+backend/uv.lock linguist-generated=true -diff
+frontend/package-lock.json linguist-generated=true -diff
