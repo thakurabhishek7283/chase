@@ -1,4 +1,4 @@
-# AI-Centric Interview Tracker & Resume Optimizer — Architecture
+# Chase — Architecture
 
 > A working reference for how this system is built and why, at a level useful
 > for extending it. For step-by-step setup, see [README.md](README.md).
@@ -567,9 +567,9 @@ is enforced.
 
 **CI** (`.github/workflows/ci.yml`) runs on every push and pull request:
 ruff lint + format check and the full backend suite with coverage — against
-pgvector Postgres and a real LaTeX worker built from `latex-worker/` (its TeX
-Live layer cached between runs) — the frontend format check, unit tests and
-production build, and Docker builds of the backend and frontend images.
+pgvector Postgres and the real `latex-worker/server.py` running on the
+runner's TeX Live — the frontend format check, unit tests and production
+build, and Docker builds of all three images (layer-cached between runs).
 
 ---
 

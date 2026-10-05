@@ -48,22 +48,23 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check .
 
-      # The suite compiles real documents, so it needs the real worker. The
-      # TeX Live layer is cached between runs; only the first build is slow.
-      - uses: docker/setup-buildx-action@v3
-      - name: Build LaTeX worker
-        uses: docker/build-push-action@v6
-        with:
-          context: latex-worker
-          load: true
-          tags: jarvis-latex:ci
-          cache-from: type=gha,scope=latex-worker
-          cache-to: type=gha,scope=latex-worker,mode=max
-      - name: Start LaTeX worker
+      # The suite compiles real documents, so it needs a real worker. The
+      # worker is a stdlib-only HTTP wrapper around the engines, so it runs
+      # directly on Debian's TeX Live here — minutes faster than a cold build
+      # of the image, which the `images` job below still builds and caches.
+      - name: LaTeX engines
+        working-directory: .
         run: |
-          docker run -d --name latex-worker -p 8100:8100 jarvis-latex:ci
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+            texlive-xetex texlive-luatex latexmk
+      - name: Start LaTeX worker
+        working-directory: .
+        run: |
+          nohup python3 latex-worker/server.py > latex-worker.log 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://localhost:8100/health && exit 0; sleep 1; done
-          docker logs latex-worker; exit 1
+          cat latex-worker.log; exit 1
 
       - name: Test
         env:
@@ -95,8 +96,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The LaTeX worker is already built by the backend job.
-        image: [backend, frontend]
+        image: [backend, frontend, latex-worker]
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v3

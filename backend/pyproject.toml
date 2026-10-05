@@ -1,7 +1,7 @@
 [project]
 name = "jarvis-backend"
 version = "0.1.0"
-description = "FastAPI backend for the AI-centric interview tracker and LaTeX resume optimizer"
+description = "Chase backend: ATS scoring, template-preserving LaTeX resume tailoring and semantic job matching"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.5",

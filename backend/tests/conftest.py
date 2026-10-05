@@ -145,11 +145,6 @@ async def admin_client(sign_in: SignIn) -> AsyncClient:
     return await sign_in(ADMIN_EMAIL, "Admin User")
 
 
-@pytest.fixture
-def anyio_backend() -> str:
-    return "asyncio"
-
-
 #: A resume that parses and compiles, for tests that need one to exist rather
 #: than to test how one is made.
 SAMPLE_TEX = r"""\documentclass{article}

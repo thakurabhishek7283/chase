@@ -1,6 +1,6 @@
 # Frontend
 
-The Angular single-page app for the interview tracker and resume optimizer —
+The Angular single-page app for Chase —
 standalone components, state in signals. See the root [README](../README.md)
 for running the whole stack and [ARCHITECTURE.md §10](../ARCHITECTURE.md#10-frontend-design)
 for how it is put together.

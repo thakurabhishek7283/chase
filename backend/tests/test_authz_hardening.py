@@ -7,7 +7,6 @@ cannot come back silently.
 
 import uuid
 
-import pytest
 from httpx import AsyncClient
 from sqlmodel import col, select
 
@@ -20,8 +19,6 @@ from app.models.session import RefreshToken
 #: with `test_`, and warns when it turns out to be a sessionmaker.
 from tests.conftest import TEST_PASSWORD, MakeResume
 from tests.conftest import test_session_maker as session_maker
-
-pytestmark = pytest.mark.anyio
 
 
 async def audit_actions(action: str | None = None) -> list[AuditLog]:

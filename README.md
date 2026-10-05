@@ -1,7 +1,8 @@
-# AI-Centric Interview Tracker & Resume Optimizer
+# Chase — AI resume tailoring & job matching
 
 [![CI](https://github.com/thakurabhishek7283/chase/actions/workflows/ci.yml/badge.svg)](https://github.com/thakurabhishek7283/chase/actions/workflows/ci.yml)
 [![Release images](https://github.com/thakurabhishek7283/chase/actions/workflows/release.yml/badge.svg)](https://github.com/thakurabhishek7283/chase/actions/workflows/release.yml)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
 An Angular + FastAPI system that semantically matches job openings to your
 career goals, and uses Gemini to score your LaTeX resume against an ATS and
@@ -9,6 +10,10 @@ tailor it: repeatedly, one reviewed change at a time, without the template
 ever moving.
 
 ![Job profiles](docs/screenshots/job-profiles.png)
+
+> The services, database and containers still carry the project's earlier
+> codename, `jarvis` (for example the `jarvis` Compose project, the `jarvis`
+> database, `JARVIS_TEST_DATABASE_URL`).
 
 > 📖 **[ARCHITECTURE.md](ARCHITECTURE.md)** covers the system design, data
 > model, request flows, deployment, and known gaps.
@@ -230,3 +235,7 @@ and next steps are listed in [ARCHITECTURE.md §14](ARCHITECTURE.md#14-known-gap
   <img src="docs/screenshots/resume-upload.png" width="49%" alt="Uploading a LaTeX resume">
   <img src="docs/screenshots/sign-in.png" width="49%" alt="Sign-in">
 </p>
+
+## Licence
+
+[MIT](LICENSE) © Abhishek Thakur
