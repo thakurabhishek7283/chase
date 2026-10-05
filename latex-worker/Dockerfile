@@ -9,7 +9,7 @@
 # fonts, XeTeX/LuaTeX for fontspec-based templates, tikz for icon/timeline
 # CVs, and latexmk. If an upload 422s on a package outside this set, add it
 # (or its collection) to the `tlmgr install` line below rather than widening
-# the scheme — see ARCHITECTURE.md §7.6.
+# the scheme — see ARCHITECTURE.md §6.5.
 #
 # This image runs as a long-lived service, not a one-shot `docker run --rm`:
 # server.py (stdlib-only, no extra dependency worth a layer here) wraps the
@@ -27,17 +27,32 @@ RUN apt-get update \
 
 WORKDIR /tmp/texlive-install
 COPY texlive.profile .
-RUN curl -fsSL "${CTAN_MIRROR}/install-tl-unx.tar.gz" | tar -xz --strip-components=1 \
+# The binary directory is named after the platform (x86_64-linux,
+# aarch64-linux, ...), so it is globbed rather than hard-coded — the same
+# Dockerfile builds natively on Intel and on Apple Silicon / ARM servers.
+RUN set -eux \
+    && curl -fsSL "${CTAN_MIRROR}/install-tl-unx.tar.gz" | tar -xz --strip-components=1 \
     && ./install-tl -profile texlive.profile -repository "${CTAN_MIRROR}" \
-    && /usr/local/texlive/*/bin/x86_64-linux/tlmgr install \
+    && TL_BIN="$(echo /usr/local/texlive/*/bin/*-linux)" \
+    && "${TL_BIN}/tlmgr" install \
         collection-latexrecommended collection-latexextra \
         collection-fontsrecommended collection-fontsextra \
         collection-xetex collection-luatex collection-pictures \
         collection-langenglish collection-plaingeneric latexmk \
-    && ln -sf /usr/local/texlive/*/bin/x86_64-linux/* /usr/local/bin/ \
+    && ln -sf "${TL_BIN}"/* /usr/local/bin/ \
     && cd / && rm -rf /tmp/texlive-install
+
+# The documents compiled here are untrusted (uploaded, then rewritten by an
+# LLM). Shell escape is already off (server.py), but there is no reason for
+# the engine process to hold root inside the container either. The home
+# directory is where LuaTeX and fontconfig keep their font caches.
+RUN useradd --system --create-home --uid 10001 latex
+WORKDIR /home/latex
 
 COPY server.py /usr/local/bin/server.py
 
+USER latex
 EXPOSE 8100
-CMD ["python3", "/usr/local/bin/server.py"]
+HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=5 \
+    CMD curl -fsS http://localhost:8100/health || exit 1
+CMD ["python3", "-u", "/usr/local/bin/server.py"]
