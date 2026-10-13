@@ -66,6 +66,103 @@ def test_has_llm_credentials_reads_the_environment_too(monkeypatch) -> None:
     assert provider_module.has_llm_credentials()
 
 
+# --- OpenAI-compatible provider ---------------------------------------------
+
+AZURE_URL = "https://example.cognitiveservices.azure.com/openai/v1"
+
+
+def _openai(**overrides) -> Settings:
+    return _settings(
+        openai_api_key="test-key",
+        openai_base_url=AZURE_URL,
+        openai_model="gpt-6.1-sol",
+        **overrides,
+    )
+
+
+def test_auto_picks_gemini_unless_openai_is_fully_configured() -> None:
+    assert _settings().active_llm_provider == "google"
+    assert _settings(openai_api_key="k").active_llm_provider == "google"
+    assert _settings(openai_model="m").active_llm_provider == "google"
+    assert _openai().active_llm_provider == "openai"
+
+
+def test_an_explicit_provider_overrides_auto() -> None:
+    assert _openai(llm_provider="google").active_llm_provider == "google"
+    assert _settings(llm_provider="openai").active_llm_provider == "openai"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("1", "medium"),
+        ("true", "medium"),
+        ("High", "high"),
+        ("low", "low"),
+        ("0", None),
+        ("false", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_reasoning_setting_is_normalised(raw, expected) -> None:
+    assert _settings(openai_reasoning=raw).openai_reasoning == expected
+
+
+def test_an_unrecognised_reasoning_value_is_refused_at_load() -> None:
+    with pytest.raises(ValueError, match="OPENAI_REASONING"):
+        _settings(openai_reasoning="extreme")
+
+
+def test_resolve_model_builds_a_responses_model_for_the_configured_endpoint(monkeypatch) -> None:
+    from pydantic_ai.models.openai import OpenAIResponsesModel
+
+    from app.ai import provider as provider_module
+
+    monkeypatch.setattr(provider_module, "get_settings", lambda: _openai(openai_reasoning="1"))
+    model = provider_module.resolve_model()
+
+    assert isinstance(model, OpenAIResponsesModel)
+    assert model.model_name == "gpt-6.1-sol"
+    assert str(model.client.base_url).startswith(AZURE_URL)
+    assert model.settings["openai_reasoning_effort"] == "medium"
+
+
+def test_resolve_model_sends_no_reasoning_control_when_it_is_off(monkeypatch) -> None:
+    from app.ai import provider as provider_module
+
+    monkeypatch.setattr(provider_module, "get_settings", lambda: _openai())
+    model = provider_module.resolve_model()
+
+    assert not (model.settings or {}).get("openai_reasoning_effort")
+
+
+def test_openai_credentials_need_both_a_key_and_a_model(monkeypatch) -> None:
+    from app.ai import provider as provider_module
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(
+        provider_module, "get_settings", lambda: _settings(llm_provider="openai", openai_model="m")
+    )
+    assert not provider_module.has_llm_credentials()
+
+    monkeypatch.setattr(provider_module, "get_settings", lambda: _openai())
+    assert provider_module.has_llm_credentials()
+
+
+def test_the_missing_credentials_hint_names_the_active_providers_variables(monkeypatch) -> None:
+    from app.ai import provider as provider_module
+
+    monkeypatch.setattr(provider_module, "get_settings", lambda: _settings())
+    assert "GOOGLE_API_KEY" in provider_module.llm_credentials_hint()
+
+    monkeypatch.setattr(
+        provider_module, "get_settings", lambda: _settings(llm_provider="openai")
+    )
+    hint = provider_module.llm_credentials_hint()
+    assert "OPENAI_API_KEY" in hint and "OPENAI_MODEL" in hint
+
+
 # --- rate-limit handling -----------------------------------------------------
 
 

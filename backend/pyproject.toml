@@ -11,9 +11,9 @@ dependencies = [
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "pgvector>=0.5.0",
-    # Gemini is the only reasoning model this app talks to (app/ai/provider.py),
-    # so only the `google` extra — its SDK — is installed.
-    "pydantic-ai-slim[google]>=2.21.0",
+    # The reasoning model is either Gemini or an OpenAI-compatible endpoint such
+    # as Azure OpenAI (app/ai/provider.py), so both SDK extras are installed.
+    "pydantic-ai-slim[google,openai]>=2.21.0",
     "pydantic-settings>=2.14.2",
     "pyjwt>=2.10.1",
     "python-multipart>=0.0.32",

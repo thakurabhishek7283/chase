@@ -28,7 +28,7 @@ from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import or_
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.config import LLM_API_KEY_ENV_VAR, get_settings
+from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.security import TokenError, decode_token, subject_of
 from app.models.company import Company
@@ -221,13 +221,10 @@ def require_editable(row: Company | JobProfile, user: User, noun: str) -> None:
 
 def require_llm_key() -> None:
     """Fail fast with a clear message rather than a provider stack trace."""
-    from app.ai.provider import has_llm_credentials
+    from app.ai.provider import has_llm_credentials, llm_credentials_hint
 
     if not has_llm_credentials():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                f"This feature needs a Gemini API key. Set {LLM_API_KEY_ENV_VAR} in "
-                "backend/.env (or the environment) and restart the server."
-            ),
+            detail=llm_credentials_hint(),
         )

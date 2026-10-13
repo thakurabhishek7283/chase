@@ -2,7 +2,9 @@ import logging
 import os
 import secrets
 from functools import lru_cache
+from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,16 @@ LLM_PROVIDER_PREFIX = "google-gla"
 #: The variable the Google SDK reads its credential from, named in the 503 the
 #: LLM-backed routes return when nothing is configured.
 LLM_API_KEY_ENV_VAR = "GOOGLE_API_KEY"
+#: The same, for an OpenAI-compatible endpoint (OpenAI itself, Azure OpenAI).
+OPENAI_API_KEY_ENV_VAR = "OPENAI_API_KEY"
+
+#: What a bare truthy `OPENAI_REASONING=1` means. Reasoning models ignore the
+#: sampling knobs and are steered by an effort level instead; medium is the
+#: provider default and the right starting point for a tailoring task.
+DEFAULT_REASONING_EFFORT = "medium"
+_REASONING_EFFORTS = {"minimal", "low", "medium", "high"}
+_OFF = {"", "0", "false", "no", "off", "none"}
+_ON = {"1", "true", "yes", "on"}
 
 
 class Settings(BaseSettings):
@@ -119,10 +131,48 @@ class Settings(BaseSettings):
     local_embedding_model: str = "BAAI/bge-small-en-v1.5"
 
     # --- The reasoning LLM ---------------------------------------------------
-    # The intake, review and revision agents all talk to Gemini. `ats_model` is
-    # a model id within that API, so only Gemini ids resolve here.
+    # The intake, review and revision agents talk to either Gemini or an
+    # OpenAI-compatible endpoint (OpenAI, Azure OpenAI). `auto` picks OpenAI when
+    # both OPENAI_MODEL and OPENAI_API_KEY are set and Gemini otherwise, so
+    # existing Gemini-only setups are unchanged; set it explicitly to force one.
+    llm_provider: Literal["auto", "google", "openai"] = "auto"
+
+    # Gemini. `ats_model` is a model id within that API.
     google_api_key: str | None = None
     ats_model: str = "gemini-3.5-flash"
+
+    # OpenAI-compatible, over the Responses API. `openai_base_url` is the
+    # endpoint root, e.g. an Azure `https://<resource>.cognitiveservices.azure.com/openai/v1`;
+    # unset means api.openai.com. `openai_model` is the model, or on Azure the
+    # deployment name.
+    openai_api_key: str | None = None
+    openai_base_url: str | None = None
+    openai_model: str | None = None
+    #: Reasoning effort for the model. Accepts `1`/`true` (medium), an explicit
+    #: `minimal`/`low`/`medium`/`high`, or `0`/`false`/empty for none. Stored
+    #: normalised: an effort name, or None.
+    openai_reasoning: str | None = None
+
+    @field_validator("openai_reasoning", mode="before")
+    @classmethod
+    def _normalise_reasoning(cls, value: object) -> str | None:
+        text = str(value).strip().lower() if value is not None else ""
+        if text in _OFF:
+            return None
+        if text in _ON:
+            return DEFAULT_REASONING_EFFORT
+        if text in _REASONING_EFFORTS:
+            return text
+        raise ValueError(
+            "OPENAI_REASONING must be 1/true, 0/false, or one of: "
+            + ", ".join(sorted(_REASONING_EFFORTS))
+        )
+
+    @property
+    def active_llm_provider(self) -> Literal["google", "openai"]:
+        if self.llm_provider != "auto":
+            return self.llm_provider
+        return "openai" if (self.openai_model and self.openai_api_key) else "google"
     #: Rate-limit (429) retries. Gemini's free tier allows 5 requests/minute,
     #: which a review of a long resume can exhaust — see `ai/limits.py`.
     llm_max_retries: int = 3
@@ -130,7 +180,7 @@ class Settings(BaseSettings):
 
     @property
     def llm_model_identifier(self) -> str:
-        """The Pydantic AI model identifier, e.g. `google-gla:gemini-3.5-flash`."""
+        """The Pydantic AI identifier for the Gemini model, e.g. `google-gla:gemini-3.5-flash`."""
         return f"{LLM_PROVIDER_PREFIX}:{self.ats_model}"
 
     # --- LaTeX ---------------------------------------------------------------
