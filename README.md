@@ -32,7 +32,7 @@ project optimizes resumes, not application tracking.
 - **Backend** — FastAPI + SQLModel + Alembic, managed with [uv](https://docs.astral.sh/uv/), `backend/`
 - **Database** — PostgreSQL + pgvector, run as a Docker container
 - **PDF output** — a curated TeX Live install (pdflatex, xelatex, lualatex, latexmk), bundled into one Docker image (`latex-worker/`) and run as its own HTTP service; nothing installed on the host
-- **LLM** — Google Gemini (`gemini-3.5-flash`), reached through Pydantic AI
+- **LLM** — Google Gemini (`gemini-3.5-flash`) or any OpenAI-compatible endpoint such as Azure OpenAI, reached through Pydantic AI
 
 ## Prerequisites
 
@@ -104,9 +104,12 @@ reboot with `docker start jarvis-postgres jarvis-latex-worker`.
 
 ## The LLM key
 
-Upload intake, resume review, and patch revision all run on Gemini. Get a key
-from [Google AI Studio](https://aistudio.google.com/apikey) and put it in
-`backend/.env`:
+Upload intake, resume review, and patch revision all run on one reasoning
+model. Use either Gemini or an OpenAI-compatible endpoint (OpenAI, or Azure
+OpenAI). Whichever you configure is used.
+
+**Gemini** — get a key from [Google AI Studio](https://aistudio.google.com/apikey)
+and put it in `backend/.env`:
 
 ```ini
 # backend/.env
@@ -114,9 +117,23 @@ GOOGLE_API_KEY=...
 ATS_MODEL=gemini-3.5-flash   # gemini-2.5-pro and gemini-3.1-pro-preview also work
 ```
 
-Without it the LLM-backed routes answer 503 naming the variable to set. Note
-the free tier is 5 requests/minute and 20/day; the app waits out the per-minute
-limit using the delay the API itself asks for, rather than failing.
+**OpenAI / Azure OpenAI** — over the Responses API. On Azure, `OPENAI_MODEL` is
+the deployment name and `OPENAI_BASE_URL` ends in `/openai/v1`:
+
+```ini
+# backend/.env
+OPENAI_API_KEY=...
+OPENAI_BASE_URL=https://<resource>.cognitiveservices.azure.com/openai/v1
+OPENAI_MODEL=gpt-6.1-sol
+OPENAI_REASONING=1   # medium effort; or minimal / low / medium / high, 0 for none
+```
+
+When `OPENAI_MODEL` and `OPENAI_API_KEY` are both set they win over Gemini;
+set `LLM_PROVIDER=google` or `LLM_PROVIDER=openai` to force one explicitly.
+
+Without any key the LLM-backed routes answer 503 naming the variables to set.
+Note Gemini's free tier is 5 requests/minute and 20/day; the app waits out the
+per-minute limit using the delay the API itself asks for, rather than failing.
 
 An upload is not stored until an LLM call *and* a real compile both succeed, so
 both the key and a running LaTeX worker are required before you can use the
@@ -136,7 +153,7 @@ one is for. The ones you must set yourself before first run:
 |---|---|
 | `JWT_SECRET_KEY` | Unset ⇒ a random key per process — sessions die on every restart |
 | `BOOTSTRAP_ADMIN_EMAIL` | The address promoted to admin at registration |
-| `GOOGLE_API_KEY` | Gemini powers intake, review and tailoring — nothing works without it |
+| `GOOGLE_API_KEY` | Gemini powers intake, review and tailoring — unless you configure an OpenAI-compatible model instead (below); one of the two is required |
 
 ## Tests
 
@@ -158,7 +175,7 @@ service container and the LaTeX worker started from `latex-worker/server.py`.
 
 | Symptom | Fix |
 |---|---|
-| `503 … needs a Gemini API key` | Set `GOOGLE_API_KEY` in `backend/.env` and restart |
+| `503 … needs a Gemini API key` / `needs an OpenAI-compatible model` | Set `GOOGLE_API_KEY` (or `OPENAI_API_KEY` + `OPENAI_MODEL`) in `backend/.env` and restart |
 | Every PDF compile fails / engine reports unavailable | Check the LaTeX worker is actually running (`docker ps`) and `LATEX_WORKER_URL` points at it — `docker logs jarvis-latex-worker` (native) or `docker compose logs latex-worker` (Compose) |
 | `401` on every request after a restart | `JWT_SECRET_KEY` was unset and got regenerated — set it in `backend/.env` |
 | No **Moderation** link in the sidebar | The signed-in account isn't an admin — register with `BOOTSTRAP_ADMIN_EMAIL` or `PATCH /users/{id}/role` |

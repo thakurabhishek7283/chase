@@ -408,10 +408,16 @@ endpoint is unaffected, by design (§13).
 
 ## 8. The LLM seam
 
-`ai/provider.py` is the single place that resolves `ATS_MODEL` into a live
-Pydantic AI model; the intake, review, and patch-revision agents take an
+`ai/provider.py` is the single place that resolves the configured model into a
+live Pydantic AI model; the intake, review, and patch-revision agents take an
 injectable `Agent` and never name a vendor, so changing model — or adding a
 second one behind the same seam — is one module, not every agent.
+
+Two backends sit behind it: Gemini (`ATS_MODEL`) and any OpenAI-compatible
+endpoint over the Responses API (`OPENAI_BASE_URL`, `OPENAI_MODEL`,
+`OPENAI_API_KEY`, `OPENAI_REASONING`) — OpenAI itself or Azure OpenAI.
+`LLM_PROVIDER=auto` prefers OpenAI only when its model and key are both set, so
+a Gemini-only `.env` behaves exactly as before.
 
 Two details worth knowing if you touch this code:
 
@@ -566,8 +572,12 @@ Full annotated list in `backend/.env.example`; the essentials:
 | `DATABASE_URL` | `postgresql+asyncpg://jarvis:…@localhost:5432/jarvis` | Must use the `asyncpg` driver |
 | `JWT_SECRET_KEY` | random per process | **Set this.** ≥32 bytes (RFC 7518 §3.2) or refused |
 | `BOOTSTRAP_ADMIN_EMAIL` | – | Promoted to admin at registration |
+| `LLM_PROVIDER` | `auto` | `auto`, `google` or `openai`. `auto` uses OpenAI when `OPENAI_MODEL` and `OPENAI_API_KEY` are both set, Gemini otherwise — see §8 |
 | `ATS_MODEL` | `gemini-3.5-flash` | The Gemini model the agents use — see §8 |
-| `GOOGLE_API_KEY` | – | **Set this.** Required before any upload or review works |
+| `GOOGLE_API_KEY` | – | Gemini credential. **One of this or `OPENAI_*` must be set** before any upload or review works |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | – | An OpenAI-compatible model over the Responses API; on Azure OpenAI the model is the deployment name |
+| `OPENAI_BASE_URL` | api.openai.com | Endpoint root, e.g. `https://<resource>.cognitiveservices.azure.com/openai/v1` |
+| `OPENAI_REASONING` | off | `1`/`true` (medium), `minimal`/`low`/`medium`/`high`, or `0`/empty for none |
 | `EMBEDDING_DIM` / `LOCAL_EMBEDDING_MODEL` | `384` / `BAAI/bge-small-en-v1.5` | Dimension is baked into the pgvector column — changing it needs a migration + full re-index |
 | `LATEX_DEFAULT_ENGINE` | `pdflatex` | Server default; per-resume overrides live in `resumes.latex_engine` |
 | `LATEX_WORKER_URL` | `http://localhost:8100` | Where the LaTeX worker service listens — `docker-compose.yml` points this at the `latex-worker` service; the default is correct for a standalone worker container in native development. See §6.5 |
